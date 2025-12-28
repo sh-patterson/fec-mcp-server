@@ -1,0 +1,15 @@
+node_modules/
+build/
+.env
+*.log
+coverage/
+.DS_Store
+*.tgz
+.vitest/
+
+# Internal reference documents
+RESOURCES/
+
+# Claude Code settings
+CLAUDE.md
+.claude/
