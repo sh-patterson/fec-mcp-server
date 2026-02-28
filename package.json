@@ -4,6 +4,7 @@
   "description": "MCP server for FEC campaign finance research and transparency",
   "type": "module",
   "main": "build/index.js",
+  "types": "build/index.d.ts",
   "bin": {
     "fec-mcp-server": "./build/index.js"
   },
@@ -11,13 +12,12 @@
     "build": "tsc && chmod 755 build/index.js",
     "dev": "tsx watch src/index.ts",
     "start": "node build/index.js",
-    "test": "vitest",
-    "test:run": "vitest run",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src tests",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepack": "npm run build && npm run typecheck"
   },
   "keywords": [
     "mcp",
@@ -25,16 +25,29 @@
     "campaign-finance",
     "transparency",
     "model-context-protocol",
-    "federal-election-commission"
+    "federal-election-commission",
+    "openai",
+    "claude",
+    "ai-tools"
   ],
-  "author": "",
+  "author": "Shawn Patterson",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sh-patterson/fec-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sh-patterson/fec-mcp-server/issues"
+  },
+  "homepage": "https://github.com/sh-patterson/fec-mcp-server#readme",
   "engines": {
     "node": ">=20"
   },
   "files": [
     "build",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "package.json"
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
