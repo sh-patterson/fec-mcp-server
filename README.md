@@ -282,6 +282,26 @@ npm run acceptance:notable
 
 The FEC API allows 1,000 requests per hour with an API key. For higher limits (up to 7,200 requests/hour), contact the FEC.
 
+## Docker
+
+Build the container image locally:
+
+```bash
+docker build -t fec-mcp-server .
+```
+
+Run it with your API key provided at runtime:
+
+```bash
+docker run --rm -i \
+  -e FEC_API_KEY=your-api-key-here \
+  fec-mcp-server
+```
+
+## Releases
+
+Glama checks expect a GitHub release. Create and publish a tag such as `v1.0.0` after pushing changes.
+
 ## License
 
 MIT
