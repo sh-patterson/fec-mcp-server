@@ -65,6 +65,22 @@ interface ToolResult {
   isError?: boolean;
 }
 
+interface BaseToolResult {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+}
+
+interface ToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+interface ToolRegistration {
+  def: ToolDefinition;
+  execute: (params: unknown) => Promise<BaseToolResult>;
+}
+
 /**
  * Register all FEC tools with the MCP server
  */
@@ -74,139 +90,112 @@ export function registerTools(server: McpServer, config: Config): void {
     baseUrl: config.fecApiBaseUrl,
   });
 
-  // Register search_candidates
-  server.tool(
-    SEARCH_CANDIDATES_TOOL.name,
-    SEARCH_CANDIDATES_TOOL.description,
-    SEARCH_CANDIDATES_TOOL.inputSchema,
-    async (params): Promise<ToolResult> => {
-      const result = await executeSearchCandidates(client, params as {
-        q: string;
-        election_year?: number;
-        office?: 'H' | 'S' | 'P';
-        state?: string;
-        party?: string;
-      });
-      return { ...result };
-    }
-  );
+  const toolRegistrations: ToolRegistration[] = [
+    {
+      def: SEARCH_CANDIDATES_TOOL,
+      execute: async (params) =>
+        executeSearchCandidates(client, params as {
+          q: string;
+          election_year?: number;
+          office?: 'H' | 'S' | 'P';
+          state?: string;
+          party?: string;
+        }),
+    },
+    {
+      def: GET_COMMITTEE_FINANCES_TOOL,
+      execute: async (params) =>
+        executeGetCommitteeFinances(client, params as {
+          committee_id: string;
+          cycle?: number;
+        }),
+    },
+    {
+      def: GET_RECEIPTS_TOOL,
+      execute: async (params) =>
+        executeGetReceipts(client, params as {
+          committee_id: string;
+          min_amount?: number;
+          two_year_transaction_period?: number;
+          cycle?: number;
+          contributor_type?: 'individual' | 'committee';
+          include_notable?: boolean;
+          fuzzy_threshold?: number;
+          limit?: number;
+          sort_by?: 'amount' | 'date';
+        }),
+    },
+    {
+      def: GET_DISBURSEMENTS_TOOL,
+      execute: async (params) =>
+        executeGetDisbursements(client, params as {
+          committee_id: string;
+          min_amount?: number;
+          two_year_transaction_period?: number;
+          cycle?: number;
+          purpose?: string;
+          include_notable?: boolean;
+          fuzzy_threshold?: number;
+          limit?: number;
+          sort_by?: 'amount' | 'date';
+        }),
+    },
+    {
+      def: GET_INDEPENDENT_EXPENDITURES_TOOL,
+      execute: async (params) =>
+        executeGetIndependentExpenditures(client, params as {
+          candidate_id?: string;
+          committee_id?: string;
+          support_oppose?: 'support' | 'oppose';
+          min_amount?: number;
+          cycle?: number;
+          limit?: number;
+        }),
+    },
+    {
+      def: GET_COMMITTEE_FLAGS_TOOL,
+      execute: async (params) =>
+        executeGetCommitteeFlags(client, params as {
+          committee_id: string;
+          cycle?: number;
+        }),
+    },
+    {
+      def: SEARCH_DONORS_TOOL,
+      execute: async (params) =>
+        executeSearchDonors(client, params as {
+          contributor_name?: string;
+          contributor_employer?: string;
+          contributor_occupation?: string;
+          contributor_state?: string;
+          min_amount?: number;
+          cycle?: number;
+          limit?: number;
+        }),
+    },
+    {
+      def: SEARCH_SPENDING_TOOL,
+      execute: async (params) =>
+        executeSearchSpending(client, params as {
+          description?: string;
+          recipient_name?: string;
+          recipient_state?: string;
+          min_amount?: number;
+          cycle?: number;
+          limit?: number;
+        }),
+    },
+  ];
 
-  // Register get_committee_finances
-  server.tool(
-    GET_COMMITTEE_FINANCES_TOOL.name,
-    GET_COMMITTEE_FINANCES_TOOL.description,
-    GET_COMMITTEE_FINANCES_TOOL.inputSchema,
-    async (params): Promise<ToolResult> => {
-      const result = await executeGetCommitteeFinances(client, params as {
-        committee_id: string;
-        cycle?: number;
-      });
-      return { ...result };
-    }
-  );
-
-  // Register get_receipts
-  server.tool(
-    GET_RECEIPTS_TOOL.name,
-    GET_RECEIPTS_TOOL.description,
-    GET_RECEIPTS_TOOL.inputSchema,
-    async (params): Promise<ToolResult> => {
-      const result = await executeGetReceipts(client, params as {
-        committee_id: string;
-        min_amount?: number;
-        two_year_transaction_period?: number;
-        contributor_type?: 'individual' | 'committee';
-        limit?: number;
-        sort_by?: 'amount' | 'date';
-      });
-      return { ...result };
-    }
-  );
-
-  // Register get_disbursements
-  server.tool(
-    GET_DISBURSEMENTS_TOOL.name,
-    GET_DISBURSEMENTS_TOOL.description,
-    GET_DISBURSEMENTS_TOOL.inputSchema,
-    async (params): Promise<ToolResult> => {
-      const result = await executeGetDisbursements(client, params as {
-        committee_id: string;
-        min_amount?: number;
-        two_year_transaction_period?: number;
-        purpose?: string;
-        limit?: number;
-        sort_by?: 'amount' | 'date';
-      });
-      return { ...result };
-    }
-  );
-
-  // Register get_independent_expenditures
-  server.tool(
-    GET_INDEPENDENT_EXPENDITURES_TOOL.name,
-    GET_INDEPENDENT_EXPENDITURES_TOOL.description,
-    GET_INDEPENDENT_EXPENDITURES_TOOL.inputSchema,
-    async (params): Promise<ToolResult> => {
-      const result = await executeGetIndependentExpenditures(client, params as {
-        candidate_id?: string;
-        committee_id?: string;
-        support_oppose?: 'support' | 'oppose';
-        min_amount?: number;
-        cycle?: number;
-        limit?: number;
-      });
-      return { ...result };
-    }
-  );
-
-  // Register get_committee_flags
-  server.tool(
-    GET_COMMITTEE_FLAGS_TOOL.name,
-    GET_COMMITTEE_FLAGS_TOOL.description,
-    GET_COMMITTEE_FLAGS_TOOL.inputSchema,
-    async (params): Promise<ToolResult> => {
-      const result = await executeGetCommitteeFlags(client, params as {
-        committee_id: string;
-        cycle?: number;
-      });
-      return { ...result };
-    }
-  );
-
-  // Register search_donors
-  server.tool(
-    SEARCH_DONORS_TOOL.name,
-    SEARCH_DONORS_TOOL.description,
-    SEARCH_DONORS_TOOL.inputSchema,
-    async (params): Promise<ToolResult> => {
-      const result = await executeSearchDonors(client, params as {
-        contributor_name?: string;
-        contributor_employer?: string;
-        contributor_occupation?: string;
-        contributor_state?: string;
-        min_amount?: number;
-        cycle?: number;
-        limit?: number;
-      });
-      return { ...result };
-    }
-  );
-
-  // Register search_spending
-  server.tool(
-    SEARCH_SPENDING_TOOL.name,
-    SEARCH_SPENDING_TOOL.description,
-    SEARCH_SPENDING_TOOL.inputSchema,
-    async (params): Promise<ToolResult> => {
-      const result = await executeSearchSpending(client, params as {
-        description?: string;
-        recipient_name?: string;
-        recipient_state?: string;
-        min_amount?: number;
-        cycle?: number;
-        limit?: number;
-      });
-      return { ...result };
-    }
-  );
+  for (const { def, execute } of toolRegistrations) {
+    server.tool(
+      def.name,
+      def.description,
+      def.inputSchema,
+      async (params): Promise<ToolResult> => {
+        const result = await execute(params);
+        return { ...result } as ToolResult;
+      }
+    );
+  }
 }

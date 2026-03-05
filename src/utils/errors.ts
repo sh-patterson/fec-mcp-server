@@ -2,6 +2,27 @@
  * Custom Error Types for FEC MCP Server
  */
 
+const REDACTED_VALUE = '[REDACTED]';
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Redact API key values from arbitrary text to avoid leaking secrets in tool output.
+ */
+export function sanitizeApiKey(text: string, apiKey?: string): string {
+  let sanitized = text
+    .replace(/([?&]api_key=)([^&#\s]+)/gi, `$1${REDACTED_VALUE}`)
+    .replace(/("api_key"\s*:\s*")[^"]+(")/gi, `$1${REDACTED_VALUE}$2`);
+
+  if (apiKey) {
+    sanitized = sanitized.replace(new RegExp(escapeRegExp(apiKey), 'g'), REDACTED_VALUE);
+  }
+
+  return sanitized;
+}
+
 export class FECApiError extends Error {
   public readonly statusCode?: number;
   public readonly endpoint?: string;
@@ -56,25 +77,34 @@ export class NotFoundError extends FECApiError {
  * Format error for MCP tool response
  */
 export function formatErrorForToolResponse(error: unknown): string {
+  const apiKey = process.env.FEC_API_KEY;
+  let message: string;
+
   if (error instanceof RateLimitError) {
-    return `Rate limit exceeded. The FEC API has request limits. Please wait a moment and try again.`;
+    message = 'Rate limit exceeded. The FEC API has request limits. Please wait a moment and try again.';
+    return sanitizeApiKey(message, apiKey);
   }
 
   if (error instanceof NotFoundError) {
-    return error.message;
+    message = error.message;
+    return sanitizeApiKey(message, apiKey);
   }
 
   if (error instanceof FECApiError) {
-    return `FEC API error: ${error.message}`;
+    message = `FEC API error: ${error.message}`;
+    return sanitizeApiKey(message, apiKey);
   }
 
   if (error instanceof ValidationError) {
-    return `Invalid input: ${error.message}`;
+    message = `Invalid input: ${error.message}`;
+    return sanitizeApiKey(message, apiKey);
   }
 
   if (error instanceof Error) {
-    return `Error: ${error.message}`;
+    message = `Error: ${error.message}`;
+    return sanitizeApiKey(message, apiKey);
   }
 
-  return 'An unexpected error occurred.';
+  message = 'An unexpected error occurred.';
+  return sanitizeApiKey(message, apiKey);
 }

@@ -47,6 +47,19 @@ describe('get_receipts tool', () => {
 
     expect(result.content[0].text).toContain('CALIFORNIA TEACHERS PAC');
     expect(result.content[0].text).toContain('$5,000');
+    expect(result.content[0].text).toContain('Committee/organization receipts:');
+    expect(result.content[0].text).toContain('### Flagged Notables');
+  });
+
+  it('should omit notable block when include_notable is false', async () => {
+    vi.spyOn(mockClient, 'getScheduleA').mockResolvedValue(mockScheduleAResponse);
+
+    const result = await executeGetReceipts(mockClient, {
+      committee_id: 'C00523969',
+      include_notable: false,
+    });
+
+    expect(result.content[0].text).not.toContain('### Flagged Notables');
   });
 
   it('should handle empty results', async () => {
@@ -97,6 +110,38 @@ describe('get_receipts tool', () => {
 
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({ contributor_type: 'individual' })
+    );
+  });
+
+  it('should auto-align transaction period from cycle when provided', async () => {
+    const spy = vi.spyOn(mockClient, 'getScheduleA').mockResolvedValue(
+      mockScheduleAResponse
+    );
+
+    const result = await executeGetReceipts(mockClient, {
+      committee_id: 'C00523969',
+      cycle: 2024,
+    });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ two_year_transaction_period: 2024 })
+    );
+    expect(result.content[0].text).toContain('2024 cycle (auto-aligned from cycle)');
+  });
+
+  it('should prefer explicit two_year_transaction_period over cycle', async () => {
+    const spy = vi.spyOn(mockClient, 'getScheduleA').mockResolvedValue(
+      mockScheduleAResponse
+    );
+
+    await executeGetReceipts(mockClient, {
+      committee_id: 'C00523969',
+      cycle: 2024,
+      two_year_transaction_period: 2022,
+    });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ two_year_transaction_period: 2022 })
     );
   });
 

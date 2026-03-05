@@ -33,8 +33,24 @@ export function formatCurrency(amount: number): string {
 /**
  * Format date for display (YYYY-MM-DD to readable format)
  */
-export function formatDate(dateString: string): string {
-  const date = new Date(dateString);
+export function formatDate(dateString?: string | null): string {
+  if (!dateString) {
+    return 'Unknown date';
+  }
+
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  const date = dateOnlyMatch
+    ? new Date(
+        Number.parseInt(dateOnlyMatch[1], 10),
+        Number.parseInt(dateOnlyMatch[2], 10) - 1,
+        Number.parseInt(dateOnlyMatch[3], 10)
+      )
+    : new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown date';
+  }
+
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -446,9 +462,13 @@ export function formatEnrichedReceiptsText(receipts: EnrichedReceipt[], committe
     lines.push('');
   }
 
-  // Separate PAC and individual contributions
-  const pacContributions = receipts.filter(r => r.pac_classification !== null);
-  const individualContributions = receipts.filter(r => r.pac_classification === null);
+  // Separate by contributor type first; PAC classification is enrichment on top of committee/org records.
+  const individualContributions = receipts.filter(r => r.contributor_type === 'Individual');
+  const organizationContributions = receipts.filter(r => r.contributor_type !== 'Individual');
+  const pacContributions = organizationContributions.filter(r => r.pac_classification !== null);
+  const otherOrganizationContributions = organizationContributions.filter(
+    r => r.pac_classification === null
+  );
 
   if (pacContributions.length > 0) {
     lines.push('### PAC Contributions');
@@ -490,6 +510,22 @@ export function formatEnrichedReceiptsText(receipts: EnrichedReceipt[], committe
       if (receipt.occupation) {
         lines.push(`   - Occupation: ${receipt.occupation}`);
       }
+      if (location) {
+        lines.push(`   - Location: ${location}`);
+      }
+      lines.push('');
+    });
+  }
+
+  if (otherOrganizationContributions.length > 0) {
+    lines.push('### Other Committee/Organization Contributions');
+    lines.push('');
+
+    otherOrganizationContributions.forEach((receipt, index) => {
+      const location = [receipt.city, receipt.state].filter(Boolean).join(', ');
+      lines.push(`${index + 1}. **${receipt.contributor_name}** - ${formatCurrency(receipt.amount)}`);
+      lines.push(`   - Date: ${formatDate(receipt.date)}`);
+      lines.push(`   - Type: ${receipt.contributor_type}`);
       if (location) {
         lines.push(`   - Location: ${location}`);
       }

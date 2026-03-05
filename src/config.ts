@@ -9,16 +9,8 @@ import { config as loadDotenv } from 'dotenv';
 loadDotenv();
 
 export interface Config {
-  fecApiKey: string;
+  fecApiKey?: string;
   fecApiBaseUrl: string;
-}
-
-function getRequiredEnv(key: string): string {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-  return value;
 }
 
 function getOptionalEnv(key: string, defaultValue: string): string {
@@ -26,8 +18,10 @@ function getOptionalEnv(key: string, defaultValue: string): string {
 }
 
 export function loadConfig(): Config {
+  const apiKey = process.env.FEC_API_KEY?.trim();
+
   return {
-    fecApiKey: getRequiredEnv('FEC_API_KEY'),
+    fecApiKey: apiKey ? apiKey : undefined,
     fecApiBaseUrl: getOptionalEnv('FEC_API_BASE_URL', 'https://api.open.fec.gov/v1'),
   };
 }

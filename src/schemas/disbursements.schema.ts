@@ -25,12 +25,35 @@ export const getDisbursementsInputSchema = {
     .min(1980)
     .max(2030)
     .optional()
-    .describe('Two-year period (e.g., 2024 covers 2023-2024). Defaults to current cycle.'),
+    .describe('Two-year period (e.g., 2024 covers 2023-2024).'),
+
+  cycle: z
+    .number()
+    .int()
+    .min(1980)
+    .max(2030)
+    .optional()
+    .describe('Alias for two_year_transaction_period to align with finance cycle filters.'),
 
   purpose: z
     .string()
     .optional()
     .describe('Filter by disbursement purpose keyword (e.g., "CONSULTING", "MEDIA")'),
+
+  include_notable: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe('Include flagged-first notable analysis block in output (default: true)'),
+
+  fuzzy_threshold: z
+    .number()
+    .int()
+    .min(80)
+    .max(99)
+    .optional()
+    .default(90)
+    .describe('Fuzzy match confidence threshold for reference list matching (default: 90)'),
 
   limit: z
     .number()
@@ -52,7 +75,10 @@ export type GetDisbursementsInput = {
   committee_id: string;
   min_amount?: number;
   two_year_transaction_period?: number;
+  cycle?: number;
   purpose?: string;
+  include_notable?: boolean;
+  fuzzy_threshold?: number;
   limit?: number;
   sort_by?: 'amount' | 'date';
 };

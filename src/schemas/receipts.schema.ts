@@ -25,12 +25,35 @@ export const getReceiptsInputSchema = {
     .min(1980)
     .max(2030)
     .optional()
-    .describe('Two-year period (e.g., 2024 covers 2023-2024). Defaults to current cycle.'),
+    .describe('Two-year period (e.g., 2024 covers 2023-2024).'),
+
+  cycle: z
+    .number()
+    .int()
+    .min(1980)
+    .max(2030)
+    .optional()
+    .describe('Alias for two_year_transaction_period to align with finance cycle filters.'),
 
   contributor_type: z
     .enum(['individual', 'committee'])
     .optional()
     .describe('Filter by contributor type: "individual" or "committee" (PAC)'),
+
+  include_notable: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe('Include flagged-first notable analysis block in output (default: true)'),
+
+  fuzzy_threshold: z
+    .number()
+    .int()
+    .min(80)
+    .max(99)
+    .optional()
+    .default(90)
+    .describe('Fuzzy match confidence threshold for reference list matching (default: 90)'),
 
   limit: z
     .number()
@@ -52,7 +75,10 @@ export type GetReceiptsInput = {
   committee_id: string;
   min_amount?: number;
   two_year_transaction_period?: number;
+  cycle?: number;
   contributor_type?: 'individual' | 'committee';
+  include_notable?: boolean;
+  fuzzy_threshold?: number;
   limit?: number;
   sort_by?: 'amount' | 'date';
 };

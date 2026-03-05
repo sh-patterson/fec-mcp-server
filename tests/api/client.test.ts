@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FECClient } from '../../src/api/client.js';
+import { FECApiError, RateLimitError } from '../../src/utils/errors.js';
 import {
   mockCandidateSearchResponse,
   mockEmptyCandidateSearchResponse,
@@ -12,6 +13,13 @@ import {
   mockScheduleBResponse,
   createMockResponse,
 } from '../mocks/fec-responses.js';
+
+function getCalledUrl(fetchCallArg: unknown): string {
+  if (fetchCallArg instanceof URL) {
+    return fetchCallArg.toString();
+  }
+  return String(fetchCallArg);
+}
 
 describe('FECClient', () => {
   let client: FECClient;
@@ -51,7 +59,7 @@ describe('FECClient', () => {
       await client.get('/candidates/search/', { q: 'test' });
 
       expect(fetchSpy).toHaveBeenCalled();
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain(`api_key=${mockApiKey}`);
     });
 
@@ -65,7 +73,7 @@ describe('FECClient', () => {
         election_year: 2024,
       });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('q=Smith');
       expect(calledUrl).toContain('election_year=2024');
     });
@@ -79,17 +87,65 @@ describe('FECClient', () => {
     });
 
     it('should handle 429 rate limit errors', async () => {
-      vi.spyOn(global, 'fetch').mockResolvedValue(
-        createMockResponse({ error: 'Rate limit exceeded' }, 429)
-      );
+      const response = createMockResponse({ error: 'Rate limit exceeded' }, 429);
+      (response as Response).headers = new Headers({ 'Retry-After': '15' });
+      vi.spyOn(global, 'fetch').mockResolvedValue(response);
 
-      await expect(client.get('/candidates/search/')).rejects.toThrow('rate limit');
+      try {
+        await client.get('/candidates/search/');
+      } catch (error) {
+        expect(error).toBeInstanceOf(RateLimitError);
+        expect((error as RateLimitError).retryAfter).toBe(15);
+      }
     });
 
     it('should handle network errors', async () => {
       vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
 
-      await expect(client.get('/candidates/search/')).rejects.toThrow('Network error');
+      await expect(client.get('/candidates/search/')).rejects.toThrow(FECApiError);
+    });
+
+    it('should sanitize API key from fetch error messages', async () => {
+      vi.spyOn(global, 'fetch').mockRejectedValue(
+        new Error(`request failed for https://example.com?api_key=${mockApiKey}`)
+      );
+
+      try {
+        await client.get('/candidates/search/');
+      } catch (error) {
+        expect(error).toBeInstanceOf(FECApiError);
+        const message = (error as FECApiError).message;
+        expect(message).toContain('[REDACTED]');
+        expect(message).not.toContain(mockApiKey);
+      }
+    });
+
+    it('should sanitize API key from non-OK response text', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse(
+          { error: `https://api.open.fec.gov/v1/?api_key=${mockApiKey}` },
+          400
+        )
+      );
+
+      try {
+        await client.get('/candidates/search/');
+      } catch (error) {
+        expect(error).toBeInstanceOf(FECApiError);
+        const message = (error as FECApiError).message;
+        expect(message).toContain('[REDACTED]');
+        expect(message).not.toContain(mockApiKey);
+      }
+    });
+
+    it('should fail lazily when API key is not configured', async () => {
+      const clientWithoutApiKey = new FECClient({});
+      const fetchSpy = vi.spyOn(global, 'fetch');
+
+      await expect(clientWithoutApiKey.get('/candidates/search/')).rejects.toThrow(
+        'FEC API key is not configured'
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -123,7 +179,7 @@ describe('FECClient', () => {
 
       await client.searchCandidates({ q: 'Swalwell', election_year: 2024 });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('election_year=2024');
     });
 
@@ -134,7 +190,7 @@ describe('FECClient', () => {
 
       await client.searchCandidates({ q: 'Smith', office: 'H' });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('office=H');
     });
 
@@ -170,7 +226,7 @@ describe('FECClient', () => {
 
       await client.getCommitteeReports('C00523969');
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('sort=-coverage_end_date');
     });
 
@@ -181,7 +237,7 @@ describe('FECClient', () => {
 
       await client.getCommitteeReports('C00523969', { cycle: 2024 });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('cycle=2024');
     });
   });
@@ -205,7 +261,7 @@ describe('FECClient', () => {
 
       await client.getScheduleA({ committee_id: 'C00523969', min_amount: 2000 });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('min_amount=2000');
     });
 
@@ -216,7 +272,7 @@ describe('FECClient', () => {
 
       await client.getScheduleA({ committee_id: 'C00523969' });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('sort=-contribution_receipt_amount');
     });
 
@@ -227,7 +283,7 @@ describe('FECClient', () => {
 
       await client.getScheduleA({ committee_id: 'C00523969', sort_by: 'date' });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('sort=-contribution_receipt_date');
     });
 
@@ -241,7 +297,7 @@ describe('FECClient', () => {
         contributor_type: 'individual',
       });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('is_individual=true');
     });
   });
@@ -265,7 +321,7 @@ describe('FECClient', () => {
 
       await client.getScheduleB({ committee_id: 'C00523969', min_amount: 10000 });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('min_amount=10000');
     });
 
@@ -276,7 +332,7 @@ describe('FECClient', () => {
 
       await client.getScheduleB({ committee_id: 'C00523969' });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('sort=-disbursement_amount');
     });
 
@@ -287,7 +343,7 @@ describe('FECClient', () => {
 
       await client.getScheduleB({ committee_id: 'C00523969', purpose: 'MEDIA' });
 
-      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('disbursement_description=MEDIA');
     });
   });

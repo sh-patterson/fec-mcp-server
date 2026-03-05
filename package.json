@@ -17,6 +17,8 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
+    "acceptance:fec-day": "tsx scripts/fec-day-acceptance.ts",
+    "acceptance:notable": "tsx scripts/notable-live-smoke.ts",
     "prepack": "npm run build && npm run typecheck"
   },
   "keywords": [
@@ -45,6 +47,7 @@
   },
   "files": [
     "build",
+    "resources",
     "README.md",
     "LICENSE",
     "package.json"
