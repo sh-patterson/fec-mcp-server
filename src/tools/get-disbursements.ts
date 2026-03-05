@@ -7,6 +7,9 @@ import type { FECClient } from '../api/client.js';
 import { getDisbursementsInputSchema } from '../schemas/disbursements.schema.js';
 import { formatErrorForToolResponse } from '../utils/errors.js';
 import { transformScheduleB, formatDisbursementsText } from '../utils/formatters.js';
+import { loadReferenceData } from '../notable/reference-data.js';
+import { classifyNotableDisbursements } from '../notable/classifier.js';
+import { formatNotableDisbursementsText } from '../notable/formatters.js';
 
 export const GET_DISBURSEMENTS_TOOL = {
   name: 'get_disbursements',
@@ -25,16 +28,23 @@ export async function executeGetDisbursements(
     committee_id: string;
     min_amount?: number;
     two_year_transaction_period?: number;
+    cycle?: number;
+    include_notable?: boolean;
+    fuzzy_threshold?: number;
     purpose?: string;
     limit?: number;
     sort_by?: 'amount' | 'date';
   }
 ): Promise<GetDisbursementsResult> {
   try {
+    const transactionPeriod = params.two_year_transaction_period ?? params.cycle;
+    const includeNotable = params.include_notable ?? true;
+    const fuzzyThreshold = params.fuzzy_threshold ?? 90;
+
     const response = await client.getScheduleB({
       committee_id: params.committee_id,
       min_amount: params.min_amount ?? 1000,
-      two_year_transaction_period: params.two_year_transaction_period,
+      two_year_transaction_period: transactionPeriod,
       purpose: params.purpose,
       limit: params.limit ?? 20,
       sort_by: params.sort_by ?? 'amount',
@@ -63,8 +73,12 @@ export async function executeGetDisbursements(
     if (params.purpose) {
       filters.push(`purpose contains "${params.purpose}"`);
     }
-    if (params.two_year_transaction_period) {
-      filters.push(`${params.two_year_transaction_period} cycle`);
+    if (transactionPeriod) {
+      filters.push(
+        params.two_year_transaction_period
+          ? `${transactionPeriod} cycle`
+          : `${transactionPeriod} cycle (auto-aligned from cycle)`
+      );
     }
 
     if (filters.length > 0) {
@@ -73,6 +87,18 @@ export async function executeGetDisbursements(
 
     lines.push(`*Showing ${disbursements.length} of ${response.pagination.count} results*`);
     lines.push('');
+
+    if (includeNotable) {
+      const referenceData = loadReferenceData();
+      const notableItems = classifyNotableDisbursements(
+        response.results,
+        committeeName || params.committee_id,
+        referenceData,
+        fuzzyThreshold
+      );
+      lines.push(formatNotableDisbursementsText(notableItems, Math.min(params.limit ?? 20, 10)));
+      lines.push('');
+    }
 
     // Format disbursements
     const disbursementsText = formatDisbursementsText(disbursements);

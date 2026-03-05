@@ -12,6 +12,9 @@ import {
   classifyPAC,
   formatEnrichedReceiptsText,
 } from '../utils/formatters.js';
+import { loadReferenceData } from '../notable/reference-data.js';
+import { classifyNotableReceipts } from '../notable/classifier.js';
+import { formatNotableReceiptsText } from '../notable/formatters.js';
 
 export const GET_RECEIPTS_TOOL = {
   name: 'get_receipts',
@@ -30,16 +33,23 @@ export async function executeGetReceipts(
     committee_id: string;
     min_amount?: number;
     two_year_transaction_period?: number;
+    cycle?: number;
     contributor_type?: 'individual' | 'committee';
+    include_notable?: boolean;
+    fuzzy_threshold?: number;
     limit?: number;
     sort_by?: 'amount' | 'date';
   }
 ): Promise<GetReceiptsResult> {
   try {
+    const transactionPeriod = params.two_year_transaction_period ?? params.cycle;
+    const includeNotable = params.include_notable ?? true;
+    const fuzzyThreshold = params.fuzzy_threshold ?? 90;
+
     const response = await client.getScheduleA({
       committee_id: params.committee_id,
       min_amount: params.min_amount ?? 1000,
-      two_year_transaction_period: params.two_year_transaction_period,
+      two_year_transaction_period: transactionPeriod,
       contributor_type: params.contributor_type,
       limit: params.limit ?? 20,
       sort_by: params.sort_by ?? 'amount',
@@ -112,8 +122,12 @@ export async function executeGetReceipts(
     if (params.contributor_type) {
       filters.push(`${params.contributor_type}s only`);
     }
-    if (params.two_year_transaction_period) {
-      filters.push(`${params.two_year_transaction_period} cycle`);
+    if (transactionPeriod) {
+      filters.push(
+        params.two_year_transaction_period
+          ? `${transactionPeriod} cycle`
+          : `${transactionPeriod} cycle (auto-aligned from cycle)`
+      );
     }
 
     if (filters.length > 0) {
@@ -121,10 +135,34 @@ export async function executeGetReceipts(
     }
 
     lines.push(`*Showing ${enrichedReceipts.length} of ${response.pagination.count} results*`);
-    if (pacDetailsMap.size > 0) {
-      lines.push(`*PAC classification enrichment: ${pacDetailsMap.size} PACs identified*`);
+
+    const committeeOrOrgReceipts = enrichedReceipts.filter(
+      (receipt) => receipt.contributor_type !== 'Individual'
+    );
+    if (committeeOrOrgReceipts.length > 0) {
+      const classifiedCommitteeOrOrgReceipts = committeeOrOrgReceipts.filter(
+        (receipt) => receipt.pac_classification !== null
+      ).length;
+      const unclassifiedCommitteeOrOrgReceipts =
+        committeeOrOrgReceipts.length - classifiedCommitteeOrOrgReceipts;
+
+      lines.push(
+        `*Committee/organization receipts: ${committeeOrOrgReceipts.length} (PAC-classified: ${classifiedCommitteeOrOrgReceipts}, unclassified: ${unclassifiedCommitteeOrOrgReceipts})*`
+      );
     }
     lines.push('');
+
+    if (includeNotable) {
+      const referenceData = loadReferenceData();
+      const notableItems = classifyNotableReceipts(
+        enrichedReceipts,
+        committeeName || params.committee_id,
+        referenceData,
+        fuzzyThreshold
+      );
+      lines.push(formatNotableReceiptsText(notableItems, Math.min(params.limit ?? 20, 10)));
+      lines.push('');
+    }
 
     // Format enriched receipts
     const receiptsText = formatEnrichedReceiptsText(enrichedReceipts, undefined);

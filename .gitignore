@@ -7,9 +7,5 @@ coverage/
 *.tgz
 .vitest/
 
-# Internal reference documents
-RESOURCES/
-
-# Claude Code settings
-CLAUDE.md
+# Claude Code user settings
 .claude/

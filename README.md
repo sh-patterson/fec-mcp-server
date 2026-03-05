@@ -8,6 +8,7 @@ A Model Context Protocol (MCP) server for Federal Election Commission (FEC) camp
 - **get_committee_finances**: Retrieve financial summaries including receipts, disbursements, cash on hand, and burn rate
 - **get_receipts**: Get itemized contributions (Schedule A) with donor details
 - **get_disbursements**: Get itemized expenditures (Schedule B) with recipient and purpose details
+- **Flagged-first notable analysis**: Optional notable blocks for receipts/disbursements with reference-list + heuristic flag reasons
 - **get_independent_expenditures**: Track Super PAC spending for or against candidates (Schedule E)
 - **get_committee_flags**: Check for RFAIs, amendments, and compliance red flags
 - **search_donors**: Search individual donors by name, employer, or occupation across all committees
@@ -134,7 +135,10 @@ Retrieve itemized contributions (Schedule A) received by a committee.
 - `committee_id` (required): FEC committee ID
 - `min_amount` (optional): Minimum contribution amount (default: $1,000)
 - `two_year_transaction_period` (optional): Election cycle (e.g., 2024)
+- `cycle` (optional): Alias for `two_year_transaction_period`; auto-aligns receipts with finance cycle usage
 - `contributor_type` (optional): "individual" or "committee"
+- `include_notable` (optional): Include flagged-first notable block (default: `true`)
+- `fuzzy_threshold` (optional): Fuzzy matching threshold for reference-list flags (default: `90`, range: `80-99`)
 - `limit` (optional): Number of results (default: 20, max: 100)
 - `sort_by` (optional): "amount" or "date" (default: "amount")
 
@@ -151,7 +155,10 @@ Retrieve itemized expenditures (Schedule B) made by a committee.
 - `committee_id` (required): FEC committee ID
 - `min_amount` (optional): Minimum disbursement amount (default: $1,000)
 - `two_year_transaction_period` (optional): Election cycle
+- `cycle` (optional): Alias for `two_year_transaction_period`; auto-aligns disbursements with finance cycle usage
 - `purpose` (optional): Filter by purpose keyword (e.g., "MEDIA", "CONSULTING")
+- `include_notable` (optional): Include flagged-first notable block (default: `true`)
+- `fuzzy_threshold` (optional): Fuzzy matching threshold for reference-list flags (default: `90`, range: `80-99`)
 - `limit` (optional): Number of results (default: 20, max: 100)
 - `sort_by` (optional): "amount" or "date" (default: "amount")
 
@@ -264,6 +271,13 @@ npm run build
 npm run typecheck
 ```
 
+### Live acceptance checks
+
+```bash
+npm run acceptance:fec-day
+npm run acceptance:notable
+```
+
 ## API Rate Limits
 
 The FEC API allows 1,000 requests per hour with an API key. For higher limits (up to 7,200 requests/hour), contact the FEC.
@@ -281,3 +295,4 @@ This tool is designed for campaign finance transparency research. It provides ac
 - [OpenFEC API Documentation](https://api.open.fec.gov/developers/)
 - [FEC.gov](https://www.fec.gov/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
+- Reference list attribution: `github/DGA-Research/FEC_Coder_Project_Streamlit` (bundled snapshots under `resources/reference-lists/`)

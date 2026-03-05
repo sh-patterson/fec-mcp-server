@@ -13,16 +13,7 @@ import { loadConfig } from './config.js';
 
 async function main(): Promise<void> {
   // Load configuration
-  let config;
-  try {
-    config = loadConfig();
-  } catch (error) {
-    console.error('Configuration error:', error instanceof Error ? error.message : error);
-    console.error('');
-    console.error('Please ensure FEC_API_KEY is set in your environment or .env file.');
-    console.error('You can obtain an API key at: https://api.open.fec.gov/developers/');
-    process.exit(1);
-  }
+  const config = loadConfig();
 
   // Create and configure server
   const server = createServer(config);
@@ -33,6 +24,11 @@ async function main(): Promise<void> {
   // Log to stderr (not stdout, which is reserved for JSON-RPC)
   console.error('FEC MCP Server starting...');
   console.error(`Using API base URL: ${config.fecApiBaseUrl}`);
+  if (!config.fecApiKey) {
+    console.error(
+      'Warning: FEC_API_KEY is not set. API tools will return a configuration error until the key is provided.'
+    );
+  }
 
   try {
     await server.connect(transport);

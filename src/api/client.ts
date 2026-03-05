@@ -4,7 +4,7 @@
  */
 
 import { FEC_API_BASE_URL, ENDPOINTS, DEFAULT_PER_PAGE } from './endpoints.js';
-import { FECApiError, RateLimitError } from '../utils/errors.js';
+import { FECApiError, RateLimitError, sanitizeApiKey } from '../utils/errors.js';
 import type {
   FECApiResponse,
   FECCandidate,
@@ -19,7 +19,7 @@ import type {
 } from './types.js';
 
 export interface FECClientConfig {
-  apiKey: string;
+  apiKey?: string;
   baseUrl?: string;
   timeout?: number;
 }
@@ -103,7 +103,7 @@ export interface GetFilingsParams {
 }
 
 export class FECClient {
-  private apiKey: string;
+  private apiKey?: string;
   private baseUrl: string;
   private timeout: number;
 
@@ -121,16 +121,13 @@ export class FECClient {
   }
 
   /**
-   * Build URL with query parameters
+   * Build URL with query parameters (without auth)
    */
   private buildUrl(
     endpoint: string,
     params?: Record<string, string | number | boolean | undefined>
-  ): string {
+  ): URL {
     const url = new URL(`${this.baseUrl}${endpoint}`);
-
-    // Always include API key
-    url.searchParams.set('api_key', this.apiKey);
 
     // Add other parameters
     if (params) {
@@ -141,7 +138,18 @@ export class FECClient {
       }
     }
 
-    return url.toString();
+    return url;
+  }
+
+  /**
+   * Apply API key auth to a URL just before making the request
+   */
+  private withApiKey(url: URL): URL {
+    const authenticatedUrl = new URL(url.toString());
+    if (this.apiKey) {
+      authenticatedUrl.searchParams.set('api_key', this.apiKey);
+    }
+    return authenticatedUrl;
   }
 
   /**
@@ -151,13 +159,22 @@ export class FECClient {
     endpoint: string,
     params?: Record<string, string | number | boolean | undefined>
   ): Promise<FECApiResponse<T>> {
-    const url = this.buildUrl(endpoint, params);
+    if (!this.apiKey) {
+      throw new FECApiError(
+        'FEC API key is not configured. Set FEC_API_KEY to use FEC API tools.',
+        undefined,
+        endpoint
+      );
+    }
+
+    const baseUrl = this.buildUrl(endpoint, params);
+    const requestUrl = this.withApiKey(baseUrl);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(requestUrl, {
         method: 'GET',
         headers: {
           Accept: 'application/json',
@@ -169,9 +186,11 @@ export class FECClient {
 
       if (!response.ok) {
         if (response.status === 429) {
-          throw new RateLimitError();
+          const retryAfterHeader = response.headers.get('Retry-After');
+          const retryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : NaN;
+          throw new RateLimitError(Number.isNaN(retryAfter) ? undefined : retryAfter);
         }
-        const errorText = await response.text();
+        const errorText = sanitizeApiKey(await response.text(), this.apiKey);
         throw new FECApiError(
           `FEC API error: ${response.status} ${response.statusText}. ${errorText}`,
           response.status,
@@ -192,7 +211,7 @@ export class FECClient {
         if (error.name === 'AbortError') {
           throw new FECApiError(`Request timeout after ${this.timeout}ms`, undefined, endpoint);
         }
-        throw error;
+        throw new FECApiError(sanitizeApiKey(error.message, this.apiKey), undefined, endpoint);
       }
 
       throw new FECApiError('Unknown error occurred', undefined, endpoint);
