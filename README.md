@@ -16,6 +16,10 @@ A Model Context Protocol (MCP) server for Federal Election Commission (FEC) camp
 
 All data comes directly from the official [OpenFEC API](https://api.open.fec.gov/developers/).
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/sh-patterson-fec-mcp-server).
+
 ## Installation
 
 ### Prerequisites
