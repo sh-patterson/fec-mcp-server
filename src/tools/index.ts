@@ -4,8 +4,20 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ZodType } from 'zod';
 import { FECClient } from '../api/client.js';
 import type { Config } from '../config.js';
+import {
+  searchCandidatesParamsSchema,
+  getCommitteeFinancesParamsSchema,
+  getReceiptsParamsSchema,
+  getDisbursementsParamsSchema,
+  getIndependentExpendituresParamsSchema,
+  getCommitteeFlagsParamsSchema,
+  searchDonorsParamsSchema,
+  searchSpendingParamsSchema,
+} from '../schemas/index.js';
+import { formatErrorForToolResponse } from '../utils/errors.js';
 
 // Import tool definitions and executors
 import {
@@ -78,6 +90,7 @@ interface ToolDefinition {
 
 interface ToolRegistration {
   def: ToolDefinition;
+  paramsSchema: ZodType;
   execute: (params: unknown) => Promise<BaseToolResult>;
 }
 
@@ -88,11 +101,13 @@ export function registerTools(server: McpServer, config: Config): void {
   const client = new FECClient({
     apiKey: config.fecApiKey,
     baseUrl: config.fecApiBaseUrl,
+    timeout: config.fecApiTimeoutMs,
   });
 
   const toolRegistrations: ToolRegistration[] = [
     {
       def: SEARCH_CANDIDATES_TOOL,
+      paramsSchema: searchCandidatesParamsSchema,
       execute: async (params) =>
         executeSearchCandidates(client, params as {
           q: string;
@@ -104,6 +119,7 @@ export function registerTools(server: McpServer, config: Config): void {
     },
     {
       def: GET_COMMITTEE_FINANCES_TOOL,
+      paramsSchema: getCommitteeFinancesParamsSchema,
       execute: async (params) =>
         executeGetCommitteeFinances(client, params as {
           committee_id: string;
@@ -112,6 +128,7 @@ export function registerTools(server: McpServer, config: Config): void {
     },
     {
       def: GET_RECEIPTS_TOOL,
+      paramsSchema: getReceiptsParamsSchema,
       execute: async (params) =>
         executeGetReceipts(client, params as {
           committee_id: string;
@@ -127,6 +144,7 @@ export function registerTools(server: McpServer, config: Config): void {
     },
     {
       def: GET_DISBURSEMENTS_TOOL,
+      paramsSchema: getDisbursementsParamsSchema,
       execute: async (params) =>
         executeGetDisbursements(client, params as {
           committee_id: string;
@@ -142,6 +160,7 @@ export function registerTools(server: McpServer, config: Config): void {
     },
     {
       def: GET_INDEPENDENT_EXPENDITURES_TOOL,
+      paramsSchema: getIndependentExpendituresParamsSchema,
       execute: async (params) =>
         executeGetIndependentExpenditures(client, params as {
           candidate_id?: string;
@@ -154,6 +173,7 @@ export function registerTools(server: McpServer, config: Config): void {
     },
     {
       def: GET_COMMITTEE_FLAGS_TOOL,
+      paramsSchema: getCommitteeFlagsParamsSchema,
       execute: async (params) =>
         executeGetCommitteeFlags(client, params as {
           committee_id: string;
@@ -162,6 +182,7 @@ export function registerTools(server: McpServer, config: Config): void {
     },
     {
       def: SEARCH_DONORS_TOOL,
+      paramsSchema: searchDonorsParamsSchema,
       execute: async (params) =>
         executeSearchDonors(client, params as {
           contributor_name?: string;
@@ -175,6 +196,7 @@ export function registerTools(server: McpServer, config: Config): void {
     },
     {
       def: SEARCH_SPENDING_TOOL,
+      paramsSchema: searchSpendingParamsSchema,
       execute: async (params) =>
         executeSearchSpending(client, params as {
           description?: string;
@@ -187,14 +209,22 @@ export function registerTools(server: McpServer, config: Config): void {
     },
   ];
 
-  for (const { def, execute } of toolRegistrations) {
+  for (const { def, paramsSchema, execute } of toolRegistrations) {
     server.tool(
       def.name,
       def.description,
       def.inputSchema,
       async (params): Promise<ToolResult> => {
-        const result = await execute(params);
-        return { ...result } as ToolResult;
+        try {
+          const validatedParams = await paramsSchema.parseAsync(params);
+          const result = await execute(validatedParams);
+          return { ...result } as ToolResult;
+        } catch (error) {
+          return {
+            content: [{ type: 'text', text: formatErrorForToolResponse(error) }],
+            isError: true,
+          };
+        }
       }
     );
   }

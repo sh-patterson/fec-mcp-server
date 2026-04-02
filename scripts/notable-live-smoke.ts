@@ -21,8 +21,10 @@ const targets: Target[] = [
   { label: 'State Negative Control', query: 'Tate Reeves', office: 'P', state: 'MS', cycle: 2024, expectFederal: false },
 ];
 
-function firstCommitteeId(text: string): string | undefined {
-  return text.match(/C\d{8}/)?.[0];
+function getPrimaryCommitteeId(
+  candidate: Awaited<ReturnType<FECClient['searchCandidates']>>['results'][number] | undefined
+): string | undefined {
+  return candidate?.principal_committees?.[0]?.committee_id;
 }
 
 async function main(): Promise<void> {
@@ -48,6 +50,11 @@ async function main(): Promise<void> {
       office: target.office,
       state: target.state,
     });
+    const rawSearch = await client.searchCandidates({
+      q: target.query,
+      office: target.office,
+      state: target.state,
+    });
 
     if (search.isError) {
       console.log('FAIL | search_candidates errored');
@@ -55,7 +62,7 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const committeeId = firstCommitteeId(search.content[0].text);
+    const committeeId = getPrimaryCommitteeId(rawSearch.results[0]);
 
     if (!target.expectFederal) {
       if (!committeeId) {

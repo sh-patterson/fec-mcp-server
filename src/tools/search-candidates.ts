@@ -29,7 +29,7 @@ export async function executeSearchCandidates(
   }
 ): Promise<SearchCandidatesResult> {
   try {
-    const response = await client.searchCandidates(params);
+    const response = await client.searchCandidates(params, 60_000);
 
     if (response.results.length === 0) {
       return {

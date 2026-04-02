@@ -31,19 +31,6 @@ export async function executeGetIndependentExpenditures(
   }
 ): Promise<GetIndependentExpendituresResult> {
   try {
-    // At least one of candidate_id or committee_id should be provided
-    if (!params.candidate_id && !params.committee_id) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Please provide either a candidate_id or committee_id to search for independent expenditures.',
-          },
-        ],
-        isError: true,
-      };
-    }
-
     // Map support/oppose to FEC indicator
     let supportOpposeIndicator: 'S' | 'O' | undefined;
     if (params.support_oppose === 'support') {

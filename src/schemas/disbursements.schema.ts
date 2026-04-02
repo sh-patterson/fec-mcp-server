@@ -71,14 +71,10 @@ export const getDisbursementsInputSchema = {
     .describe('Sort results by "amount" (descending) or "date" (most recent first)'),
 };
 
-export type GetDisbursementsInput = {
-  committee_id: string;
-  min_amount?: number;
-  two_year_transaction_period?: number;
-  cycle?: number;
-  purpose?: string;
-  include_notable?: boolean;
-  fuzzy_threshold?: number;
-  limit?: number;
-  sort_by?: 'amount' | 'date';
-};
+export const getDisbursementsParamsSchema = z.object(
+  getDisbursementsInputSchema
+);
+
+export type GetDisbursementsInput = z.infer<
+  typeof getDisbursementsParamsSchema
+>;

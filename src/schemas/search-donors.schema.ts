@@ -43,12 +43,20 @@ export const searchDonorsInputSchema = {
     .describe('Maximum number of results to return (default: 20)'),
 };
 
-export type SearchDonorsInput = {
-  contributor_name?: string;
-  contributor_employer?: string;
-  contributor_occupation?: string;
-  contributor_state?: string;
-  min_amount?: number;
-  cycle?: number;
-  limit?: number;
-};
+export const searchDonorsParamsSchema = z
+  .object(searchDonorsInputSchema)
+  .superRefine((value, ctx) => {
+    if (
+      !value.contributor_name &&
+      !value.contributor_employer &&
+      !value.contributor_occupation
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Please provide at least one search criterion: contributor_name, contributor_employer, or contributor_occupation.',
+      });
+    }
+  });
+
+export type SearchDonorsInput = z.infer<typeof searchDonorsParamsSchema>;

@@ -36,11 +36,6 @@ export const searchCandidatesInputSchema = {
     .describe('Filter by party code (e.g., "DEM", "REP", "LIB")'),
 };
 
-// Infer TypeScript type from schema
-export type SearchCandidatesInput = {
-  q: string;
-  election_year?: number;
-  office?: 'H' | 'S' | 'P';
-  state?: string;
-  party?: string;
-};
+export const searchCandidatesParamsSchema = z.object(searchCandidatesInputSchema);
+
+export type SearchCandidatesInput = z.infer<typeof searchCandidatesParamsSchema>;

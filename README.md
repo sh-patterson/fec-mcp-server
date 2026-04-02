@@ -10,7 +10,7 @@ A Model Context Protocol (MCP) server for Federal Election Commission (FEC) camp
 - **get_disbursements**: Get itemized expenditures (Schedule B) with recipient and purpose details
 - **Flagged-first notable analysis**: Optional notable blocks for receipts/disbursements with reference-list + heuristic flag reasons
 - **get_independent_expenditures**: Track Super PAC spending for or against candidates (Schedule E)
-- **get_committee_flags**: Check for RFAIs, amendments, and compliance red flags
+- **get_committee_flags**: Check for RFAIs, amendments, and related compliance red flags
 - **search_donors**: Search individual donors by name, employer, or occupation across all committees
 - **search_spending**: Search campaign spending by description or recipient across all committees
 
@@ -282,6 +282,15 @@ npm run acceptance:notable
 
 The FEC API allows 1,000 requests per hour with an API key. For higher limits (up to 7,200 requests/hour), contact the FEC.
 
+## Timeouts & API Latency
+
+The default request timeout is 30 seconds. The search tools (`search_candidates`, `search_donors`, `search_spending`) use a 60-second timeout because these FEC API endpoints perform broad database scans and are inherently slower.
+
+To override the default timeout globally, set the `FEC_API_TIMEOUT_MS` environment variable:
+
+```bash
+export FEC_API_TIMEOUT_MS=45000  # 45 seconds
+```
 ## Docker
 
 Build the container image locally:
@@ -300,7 +309,12 @@ docker run --rm -i \
 
 ## Releases
 
-Glama checks expect a GitHub release. Create and publish a tag such as `v1.0.0` after pushing changes.
+Glama checks expect a GitHub release. After merging your next repo changes, create and publish a tag such as `v1.0.0` from GitHub or with:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
 
 ## License
 
