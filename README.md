@@ -291,7 +291,6 @@ To override the default timeout globally, set the `FEC_API_TIMEOUT_MS` environme
 ```bash
 export FEC_API_TIMEOUT_MS=45000  # 45 seconds
 ```
-
 ## Docker
 
 Build the container image locally:

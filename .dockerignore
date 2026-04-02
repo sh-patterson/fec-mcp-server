@@ -1,0 +1,16 @@
+node_modules
+build
+.git
+.github
+.claude
+.env
+.env.*
+coverage
+*.log
+RESOURCES
+tests
+scripts
+vitest.config.ts
+vitest.e2e.config.ts
+CLAUDE.md
+SKILL.md
