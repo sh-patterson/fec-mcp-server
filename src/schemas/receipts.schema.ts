@@ -71,14 +71,6 @@ export const getReceiptsInputSchema = {
     .describe('Sort results by "amount" (descending) or "date" (most recent first)'),
 };
 
-export type GetReceiptsInput = {
-  committee_id: string;
-  min_amount?: number;
-  two_year_transaction_period?: number;
-  cycle?: number;
-  contributor_type?: 'individual' | 'committee';
-  include_notable?: boolean;
-  fuzzy_threshold?: number;
-  limit?: number;
-  sort_by?: 'amount' | 'date';
-};
+export const getReceiptsParamsSchema = z.object(getReceiptsInputSchema);
+
+export type GetReceiptsInput = z.infer<typeof getReceiptsParamsSchema>;

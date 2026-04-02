@@ -147,6 +147,36 @@ describe('FECClient', () => {
       );
       expect(fetchSpy).not.toHaveBeenCalled();
     });
+
+    it('should use per-request timeout when provided', async () => {
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse(mockCandidateSearchResponse)
+      );
+
+      await client.get('/candidates/search/', { q: 'test' }, 5000);
+
+      const timeoutCall = setTimeoutSpy.mock.calls.find(
+        ([, ms]) => ms === 5000
+      );
+      expect(timeoutCall).toBeDefined();
+      setTimeoutSpy.mockRestore();
+    });
+
+    it('should fall back to default timeout when per-request timeout not provided', async () => {
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse(mockCandidateSearchResponse)
+      );
+
+      await client.get('/candidates/search/', { q: 'test' });
+
+      const timeoutCall = setTimeoutSpy.mock.calls.find(
+        ([, ms]) => ms === 30000
+      );
+      expect(timeoutCall).toBeDefined();
+      setTimeoutSpy.mockRestore();
+    });
   });
 
   describe('searchCandidates', () => {
@@ -345,6 +375,46 @@ describe('FECClient', () => {
 
       const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('disbursement_description=MEDIA');
+    });
+  });
+
+  describe('getScheduleE', () => {
+    it('should include candidate and cycle filters', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse({ api_version: '1.0', pagination: { count: 0, page: 1, pages: 0, per_page: 20 }, results: [] })
+      );
+
+      await client.getScheduleE({
+        candidate_id: 'H8CA15053',
+        support_oppose_indicator: 'S',
+        two_year_transaction_period: 2024,
+      });
+
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
+      expect(calledUrl).toContain('candidate_id=H8CA15053');
+      expect(calledUrl).toContain('support_oppose_indicator=S');
+      expect(calledUrl).toContain('two_year_transaction_period=2024');
+    });
+  });
+
+  describe('getFilings', () => {
+    it('should include cycle and document type filters', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse({ api_version: '1.0', pagination: { count: 0, page: 1, pages: 0, per_page: 20 }, results: [] })
+      );
+
+      await client.getFilings({
+        committee_id: 'C00523969',
+        cycle: 2024,
+        document_type: 'RFAI',
+        limit: 10,
+      });
+
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
+      expect(calledUrl).toContain('committee_id=C00523969');
+      expect(calledUrl).toContain('cycle=2024');
+      expect(calledUrl).toContain('document_type=RFAI');
+      expect(calledUrl).toContain('per_page=10');
     });
   });
 });

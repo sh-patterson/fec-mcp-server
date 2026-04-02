@@ -39,11 +39,16 @@ export const searchSpendingInputSchema = {
     .describe('Maximum number of results to return (default: 20)'),
 };
 
-export type SearchSpendingInput = {
-  description?: string;
-  recipient_name?: string;
-  recipient_state?: string;
-  min_amount?: number;
-  cycle?: number;
-  limit?: number;
-};
+export const searchSpendingParamsSchema = z
+  .object(searchSpendingInputSchema)
+  .superRefine((value, ctx) => {
+    if (!value.description && !value.recipient_name) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Please provide at least one search criterion: description or recipient_name.',
+      });
+    }
+  });
+
+export type SearchSpendingInput = z.infer<typeof searchSpendingParamsSchema>;

@@ -4,15 +4,18 @@
 
 import { z } from 'zod';
 
-// Candidate ID format: Letter followed by 8 digits
-const candidateIdPattern = /^[A-Z]\d{8}$/;
+// Candidate IDs are either House/Senate format like H8CA15053 or presidential format like P00009423.
+const candidateIdPattern = /^(?:[HS]\d[A-Z]{2}\d{5}|P\d{8})$/;
 // Committee ID format: C followed by 8 digits
 const committeeIdPattern = /^C\d{8}$/;
 
 export const getIndependentExpendituresInputSchema = {
   candidate_id: z
     .string()
-    .regex(candidateIdPattern, 'Candidate ID must be in format like H8CA15053')
+    .regex(
+      candidateIdPattern,
+      'Candidate ID must be in format like H8CA15053 or P00009423'
+    )
     .optional()
     .describe('FEC candidate ID to find expenditures targeting this candidate'),
   committee_id: z
@@ -45,11 +48,18 @@ export const getIndependentExpendituresInputSchema = {
     .describe('Maximum number of results to return (default: 20)'),
 };
 
-export type GetIndependentExpendituresInput = {
-  candidate_id?: string;
-  committee_id?: string;
-  support_oppose?: 'support' | 'oppose';
-  min_amount?: number;
-  cycle?: number;
-  limit?: number;
-};
+export const getIndependentExpendituresParamsSchema = z
+  .object(getIndependentExpendituresInputSchema)
+  .superRefine((value, ctx) => {
+    if (!value.candidate_id && !value.committee_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Please provide either a candidate_id or committee_id to search for independent expenditures.',
+      });
+    }
+  });
+
+export type GetIndependentExpendituresInput = z.infer<
+  typeof getIndependentExpendituresParamsSchema
+>;

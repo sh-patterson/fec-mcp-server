@@ -14,6 +14,7 @@ import { executeGetReceipts } from '../../src/tools/get-receipts.js';
 import { executeGetDisbursements } from '../../src/tools/get-disbursements.js';
 import { executeGetIndependentExpenditures } from '../../src/tools/get-independent-expenditures.js';
 import { executeGetCommitteeFlags } from '../../src/tools/get-committee-flags.js';
+import { getIndependentExpendituresParamsSchema } from '../../src/schemas/independent-expenditures.schema.js';
 
 // Load .env file for e2e tests (override test setup)
 dotenvConfig();
@@ -47,7 +48,7 @@ describe('Live FEC API E2E Tests', () => {
       if (match) {
         testCommitteeId = match[0];
       }
-    });
+    }, 60000);
 
     it('should filter by state', async () => {
       const result = await executeSearchCandidates(client, {
@@ -141,13 +142,13 @@ describe('Live FEC API E2E Tests', () => {
       expect(result.isError).toBeUndefined();
     });
 
-    it('should require at least one ID parameter', async () => {
-      const result = await executeGetIndependentExpenditures(client, {
+    it('should validate required identifier parameters', () => {
+      const parsed = getIndependentExpendituresParamsSchema.safeParse({
         limit: 10,
       });
 
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('candidate_id or committee_id');
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues[0]?.message).toContain('candidate_id or committee_id');
     });
   });
 

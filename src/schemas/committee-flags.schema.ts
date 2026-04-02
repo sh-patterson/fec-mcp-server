@@ -21,7 +21,10 @@ export const getCommitteeFlagsInputSchema = {
     .describe('Two-year election cycle to check (e.g., 2024)'),
 };
 
-export type GetCommitteeFlagsInput = {
-  committee_id: string;
-  cycle?: number;
-};
+export const getCommitteeFlagsParamsSchema = z.object(
+  getCommitteeFlagsInputSchema
+);
+
+export type GetCommitteeFlagsInput = z.infer<
+  typeof getCommitteeFlagsParamsSchema
+>;

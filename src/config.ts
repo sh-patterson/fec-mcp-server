@@ -11,6 +11,7 @@ loadDotenv();
 export interface Config {
   fecApiKey?: string;
   fecApiBaseUrl: string;
+  fecApiTimeoutMs?: number;
 }
 
 function getOptionalEnv(key: string, defaultValue: string): string {
@@ -20,9 +21,13 @@ function getOptionalEnv(key: string, defaultValue: string): string {
 export function loadConfig(): Config {
   const apiKey = process.env.FEC_API_KEY?.trim();
 
+  const timeoutStr = process.env.FEC_API_TIMEOUT_MS?.trim();
+  const timeoutMs = timeoutStr ? Number.parseInt(timeoutStr, 10) : undefined;
+
   return {
     fecApiKey: apiKey ? apiKey : undefined,
     fecApiBaseUrl: getOptionalEnv('FEC_API_BASE_URL', 'https://api.open.fec.gov/v1'),
+    fecApiTimeoutMs: timeoutMs && !Number.isNaN(timeoutMs) ? timeoutMs : undefined,
   };
 }
 

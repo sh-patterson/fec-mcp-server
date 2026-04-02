@@ -22,7 +22,10 @@ export const getCommitteeFinancesInputSchema = {
     .describe('Two-year election cycle (e.g., 2024). Defaults to most recent.'),
 };
 
-export type GetCommitteeFinancesInput = {
-  committee_id: string;
-  cycle?: number;
-};
+export const getCommitteeFinancesParamsSchema = z.object(
+  getCommitteeFinancesInputSchema
+);
+
+export type GetCommitteeFinancesInput = z.infer<
+  typeof getCommitteeFinancesParamsSchema
+>;

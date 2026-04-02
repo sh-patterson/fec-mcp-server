@@ -7,11 +7,11 @@ import type { FECClient } from '../api/client.js';
 import type { CommitteeFlags, FECFiling } from '../api/types.js';
 import { getCommitteeFlagsInputSchema } from '../schemas/committee-flags.schema.js';
 import { formatErrorForToolResponse, NotFoundError } from '../utils/errors.js';
-import { formatDate, formatCurrency } from '../utils/formatters.js';
+import { formatDate } from '../utils/formatters.js';
 
 export const GET_COMMITTEE_FLAGS_TOOL = {
   name: 'get_committee_flags',
-  description: `Check a campaign committee for compliance red flags including RFAIs (Requests for Additional Information from the FEC), amended filings, and late reports. Essential for identifying potential campaign finance issues and compliance problems.`,
+  description: `Check a campaign committee for compliance red flags including RFAIs (Requests for Additional Information from the FEC) and amended filings. Essential for identifying campaign finance compliance issues that merit closer research review.`,
   inputSchema: getCommitteeFlagsInputSchema,
 };
 
@@ -92,7 +92,7 @@ function formatFlagsText(flags: CommitteeFlags): string {
   const hasIssues = flags.has_rfais || flags.has_amendments;
   if (!hasIssues) {
     lines.push('### Status: No Significant Flags');
-    lines.push('No RFAIs or amendments found in recent filings.');
+    lines.push('No RFAIs or amendments found in the reviewed filings.');
     return lines.join('\n');
   }
 
@@ -142,10 +142,12 @@ export async function executeGetCommitteeFlags(
     const [filingsResponse, rfaiResponse] = await Promise.all([
       client.getFilings({
         committee_id: params.committee_id,
+        cycle: params.cycle,
         limit: 50,
       }),
       client.getFilings({
         committee_id: params.committee_id,
+        cycle: params.cycle,
         document_type: 'RFAI',
         limit: 20,
       }),

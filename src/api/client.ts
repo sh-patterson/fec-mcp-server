@@ -96,6 +96,7 @@ export interface SearchSpendingParams {
 
 export interface GetFilingsParams {
   committee_id: string;
+  cycle?: number;
   form_type?: string;
   document_type?: string;
   is_amended?: boolean;
@@ -157,7 +158,8 @@ export class FECClient {
    */
   async get<T>(
     endpoint: string,
-    params?: Record<string, string | number | boolean | undefined>
+    params?: Record<string, string | number | boolean | undefined>,
+    timeout?: number
   ): Promise<FECApiResponse<T>> {
     if (!this.apiKey) {
       throw new FECApiError(
@@ -167,11 +169,12 @@ export class FECClient {
       );
     }
 
+    const effectiveTimeout = timeout ?? this.timeout;
     const baseUrl = this.buildUrl(endpoint, params);
     const requestUrl = this.withApiKey(baseUrl);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
     try {
       const response = await fetch(requestUrl, {
@@ -209,7 +212,7 @@ export class FECClient {
 
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          throw new FECApiError(`Request timeout after ${this.timeout}ms`, undefined, endpoint);
+          throw new FECApiError(`Request timeout after ${effectiveTimeout}ms`, undefined, endpoint);
         }
         throw new FECApiError(sanitizeApiKey(error.message, this.apiKey), undefined, endpoint);
       }
@@ -222,7 +225,8 @@ export class FECClient {
    * Search for candidates by name
    */
   async searchCandidates(
-    params: SearchCandidatesParams
+    params: SearchCandidatesParams,
+    timeout?: number
   ): Promise<FECApiResponse<FECCandidate>> {
     return this.get<FECCandidate>(ENDPOINTS.CANDIDATES_SEARCH, {
       q: params.q,
@@ -231,7 +235,7 @@ export class FECClient {
       state: params.state,
       party: params.party,
       per_page: DEFAULT_PER_PAGE,
-    });
+    }, timeout);
   }
 
   /**
@@ -344,6 +348,7 @@ export class FECClient {
   async getFilings(params: GetFilingsParams): Promise<FECApiResponse<FECFiling>> {
     return this.get<FECFiling>(ENDPOINTS.FILINGS, {
       committee_id: params.committee_id,
+      cycle: params.cycle,
       form_type: params.form_type,
       document_type: params.document_type,
       is_amended: params.is_amended,
@@ -355,7 +360,7 @@ export class FECClient {
   /**
    * Search Schedule A by donor name, employer, or occupation (across all committees)
    */
-  async searchDonors(params: SearchDonorsParams): Promise<FECApiResponse<FECScheduleA>> {
+  async searchDonors(params: SearchDonorsParams, timeout?: number): Promise<FECApiResponse<FECScheduleA>> {
     return this.get<FECScheduleA>(ENDPOINTS.SCHEDULE_A, {
       contributor_name: params.contributor_name,
       contributor_employer: params.contributor_employer,
@@ -366,13 +371,13 @@ export class FECClient {
       is_individual: true, // Only search individual donors
       sort: '-contribution_receipt_amount',
       per_page: params.limit || DEFAULT_PER_PAGE,
-    });
+    }, timeout);
   }
 
   /**
    * Search Schedule B by description or recipient (across all committees)
    */
-  async searchSpending(params: SearchSpendingParams): Promise<FECApiResponse<FECScheduleB>> {
+  async searchSpending(params: SearchSpendingParams, timeout?: number): Promise<FECApiResponse<FECScheduleB>> {
     return this.get<FECScheduleB>(ENDPOINTS.SCHEDULE_B, {
       disbursement_description: params.description,
       recipient_name: params.recipient_name,
@@ -381,7 +386,7 @@ export class FECClient {
       two_year_transaction_period: params.two_year_transaction_period,
       sort: '-disbursement_amount',
       per_page: params.limit || DEFAULT_PER_PAGE,
-    });
+    }, timeout);
   }
 }
 

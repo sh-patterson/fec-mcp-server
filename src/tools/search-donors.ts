@@ -32,19 +32,6 @@ export async function executeSearchDonors(
   }
 ): Promise<SearchDonorsResult> {
   try {
-    // Require at least one search criterion
-    if (!params.contributor_name && !params.contributor_employer && !params.contributor_occupation) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Please provide at least one search criterion: contributor_name, contributor_employer, or contributor_occupation.',
-          },
-        ],
-        isError: true,
-      };
-    }
-
     const response = await client.searchDonors({
       contributor_name: params.contributor_name,
       contributor_employer: params.contributor_employer,
@@ -53,7 +40,7 @@ export async function executeSearchDonors(
       min_amount: params.min_amount ?? 200, // Default to itemized threshold
       two_year_transaction_period: params.cycle,
       limit: params.limit ?? 20,
-    });
+    }, 60_000);
 
     // Build header
     const lines: string[] = ['## Donor Search Results'];
@@ -64,6 +51,8 @@ export async function executeSearchDonors(
     if (params.contributor_employer) criteria.push(`employer: "${params.contributor_employer}"`);
     if (params.contributor_occupation) criteria.push(`occupation: "${params.contributor_occupation}"`);
     if (params.contributor_state) criteria.push(`state: ${params.contributor_state}`);
+    if (params.min_amount) criteria.push(`minimum: ${formatCurrency(params.min_amount)}`);
+    if (params.cycle) criteria.push(`cycle: ${params.cycle}`);
 
     lines.push(`*Search: ${criteria.join(', ')}*`);
     lines.push(`*Found ${response.pagination.count} contributions, showing ${response.results.length}*`);

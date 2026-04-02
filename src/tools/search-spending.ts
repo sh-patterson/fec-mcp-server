@@ -31,19 +31,6 @@ export async function executeSearchSpending(
   }
 ): Promise<SearchSpendingResult> {
   try {
-    // Require at least one search criterion
-    if (!params.description && !params.recipient_name) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Please provide at least one search criterion: description or recipient_name.',
-          },
-        ],
-        isError: true,
-      };
-    }
-
     const response = await client.searchSpending({
       description: params.description,
       recipient_name: params.recipient_name,
@@ -51,7 +38,7 @@ export async function executeSearchSpending(
       min_amount: params.min_amount ?? 500, // Default to $500 to filter noise
       two_year_transaction_period: params.cycle,
       limit: params.limit ?? 20,
-    });
+    }, 60_000);
 
     // Build header
     const lines: string[] = ['## Spending Search Results'];
@@ -61,6 +48,8 @@ export async function executeSearchSpending(
     if (params.description) criteria.push(`description: "${params.description}"`);
     if (params.recipient_name) criteria.push(`recipient: "${params.recipient_name}"`);
     if (params.recipient_state) criteria.push(`state: ${params.recipient_state}`);
+    if (params.min_amount) criteria.push(`minimum: ${formatCurrency(params.min_amount)}`);
+    if (params.cycle) criteria.push(`cycle: ${params.cycle}`);
 
     lines.push(`*Search: ${criteria.join(', ')}*`);
     lines.push(`*Found ${response.pagination.count} disbursements, showing ${response.results.length}*`);

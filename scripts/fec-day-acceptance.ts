@@ -33,19 +33,10 @@ function elapsedMs(start: number): number {
   return Math.round(performance.now() - start);
 }
 
-function firstCommitteeId(text: string): string | undefined {
-  const matches = text.match(/C\d{8}/g);
-  return matches?.[0];
-}
-
-function firstCandidateId(text: string): string | undefined {
-  const matches = text.match(/H\d[A-Z]{2}\d{5}|S\d[A-Z]{2}\d{5}|P\d{8}/g);
-  return matches?.[0];
-}
-
-function parseFoundCount(text: string): number | null {
-  const match = text.match(/Found\s+(\d+)\s+candidate\(s\)/i);
-  return match ? Number.parseInt(match[1], 10) : null;
+function getPrimaryCommitteeId(
+  candidate: Awaited<ReturnType<FECClient['searchCandidates']>>['results'][number] | undefined
+): string | undefined {
+  return candidate?.principal_committees?.[0]?.committee_id;
 }
 
 function parseArgValue(args: string[], key: string): string | undefined {
@@ -157,6 +148,11 @@ async function main(): Promise<void> {
     console.log(`\n===== TARGET: ${target.label} =====`);
 
     const searchStart = performance.now();
+    const rawSearch = await client.searchCandidates({
+      q: target.query,
+      office: target.office,
+      state: target.state,
+    });
     const search = await executeSearchCandidates(client, {
       q: target.query,
       office: target.office,
@@ -171,13 +167,15 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const foundCount = parseFoundCount(search.content[0]?.text || '');
-    if (foundCount !== null && foundCount > 1) {
-      globalIssues.push(`${target.label}: candidate ambiguity (${foundCount} matches)`);
+    if (rawSearch.pagination.count > 1) {
+      globalIssues.push(
+        `${target.label}: candidate ambiguity (${rawSearch.pagination.count} matches)`
+      );
     }
 
-    const committeeId = firstCommitteeId(search.content[0]?.text || '');
-    const candidateId = firstCandidateId(search.content[0]?.text || '');
+    const topCandidate = rawSearch.results[0];
+    const committeeId = getPrimaryCommitteeId(topCandidate);
+    const candidateId = topCandidate?.candidate_id;
     if (!committeeId) {
       globalIssues.push(`${target.label}: no committee_id found in search output`);
       continue;

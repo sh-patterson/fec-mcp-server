@@ -1,3 +1,5 @@
+import { ZodError } from 'zod';
+
 /**
  * Custom Error Types for FEC MCP Server
  */
@@ -97,6 +99,11 @@ export function formatErrorForToolResponse(error: unknown): string {
 
   if (error instanceof ValidationError) {
     message = `Invalid input: ${error.message}`;
+    return sanitizeApiKey(message, apiKey);
+  }
+
+  if (error instanceof ZodError) {
+    message = `Invalid input: ${error.issues.map((issue) => issue.message).join('; ')}`;
     return sanitizeApiKey(message, apiKey);
   }
 
