@@ -254,9 +254,9 @@ npm install
 ### Run tests
 
 ```bash
-npm test          # Watch mode
-npm run test:run  # Single run
+npm test               # Single run
 npm run test:coverage  # With coverage
+npm run test:e2e       # Live API tests, requires FEC_API_KEY
 ```
 
 ### Build

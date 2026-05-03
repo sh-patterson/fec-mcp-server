@@ -3,9 +3,22 @@ build/
 .env
 *.log
 coverage/
+reports/
 .DS_Store
 *.tgz
 .vitest/
+
+# Local planning, research, and scratch eval artifacts
+.codex/
+.local/
+RESOURCES/
+AGENTS.md
+docs/researcher-quickstart.md
+scripts/crap-report.ts
+scripts/eval-candidates.ts
+scripts/harness-gate.ts
+scripts/live-workflow-eval.ts
+tests/scripts/
 
 # Claude Code user settings
 .claude/
