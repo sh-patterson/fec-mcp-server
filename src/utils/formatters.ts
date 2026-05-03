@@ -416,16 +416,28 @@ export function formatIndependentExpenditureText(
   return lines.join('\n');
 }
 
+const PAC_CLASSIFICATION_LABELS = [
+  ['is_leadership_pac', 'Leadership PAC', 'Leadership'],
+  ['is_corporate_pac', 'Corporate PAC', 'Corporate'],
+  ['is_labor_pac', 'Labor PAC', 'Labor'],
+  ['is_trade_pac', 'Trade/Membership PAC', 'Trade'],
+] as const;
+
+function getPACClassificationLabels(
+  pac: PACClassification,
+  labelType: 'full' | 'short'
+): string[] {
+  const labelIndex = labelType === 'full' ? 1 : 2;
+  return PAC_CLASSIFICATION_LABELS
+    .filter(([flag]) => pac[flag])
+    .map((labels) => labels[labelIndex]);
+}
+
 /**
  * Format PAC classification for display
  */
 export function formatPACClassificationText(pac: PACClassification): string {
-  const tags: string[] = [];
-
-  if (pac.is_leadership_pac) tags.push('Leadership PAC');
-  if (pac.is_corporate_pac) tags.push('Corporate PAC');
-  if (pac.is_labor_pac) tags.push('Labor PAC');
-  if (pac.is_trade_pac) tags.push('Trade/Membership PAC');
+  const tags = getPACClassificationLabels(pac, 'full');
 
   const lines = [
     `**${pac.name}** (${pac.committee_id})`,
@@ -476,12 +488,7 @@ export function formatEnrichedReceiptsText(receipts: EnrichedReceipt[], committe
 
     pacContributions.forEach((receipt, index) => {
       const pac = receipt.pac_classification!;
-      const tags: string[] = [];
-      if (pac.is_leadership_pac) tags.push('Leadership');
-      if (pac.is_corporate_pac) tags.push('Corporate');
-      if (pac.is_labor_pac) tags.push('Labor');
-      if (pac.is_trade_pac) tags.push('Trade');
-
+      const tags = getPACClassificationLabels(pac, 'short');
       const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
 
       lines.push(`${index + 1}. **${receipt.contributor_name}** - ${formatCurrency(receipt.amount)}${tagStr}`);

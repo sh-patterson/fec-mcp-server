@@ -10,8 +10,7 @@ MCP (Model Context Protocol) server providing tools to query FEC campaign financ
 
 ```bash
 npm run build               # Compile TypeScript to build/
-npm run test                # Run vitest in watch mode
-npm run test:run            # Run tests once
+npm run test                # Run tests once
 npm run test:e2e            # Run e2e tests against live FEC API
 npm run typecheck           # Type check without emitting
 npm run dev                 # Run with tsx watch (development)
