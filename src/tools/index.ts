@@ -70,7 +70,6 @@ export {
   executeSearchSpending,
 };
 
-// MCP SDK expected return type
 interface ToolResult {
   [key: string]: unknown;
   content: Array<{ type: 'text'; text: string }>;
@@ -88,15 +87,31 @@ interface ToolDefinition {
   inputSchema: Record<string, unknown>;
 }
 
-interface ToolRegistration {
-  def: ToolDefinition;
-  paramsSchema: ZodType;
-  execute: (params: unknown) => Promise<BaseToolResult>;
+function registerValidatedTool<TParams>(
+  server: McpServer,
+  def: ToolDefinition,
+  paramsSchema: ZodType<TParams>,
+  execute: (params: TParams) => Promise<BaseToolResult>
+): void {
+  server.tool(
+    def.name,
+    def.description,
+    def.inputSchema,
+    async (params): Promise<ToolResult> => {
+      try {
+        const validatedParams = await paramsSchema.parseAsync(params);
+        const result = await execute(validatedParams);
+        return { ...result };
+      } catch (error) {
+        return {
+          content: [{ type: 'text', text: formatErrorForToolResponse(error) }],
+          isError: true,
+        };
+      }
+    }
+  );
 }
 
-/**
- * Register all FEC tools with the MCP server
- */
 export function registerTools(server: McpServer, config: Config): void {
   const client = new FECClient({
     apiKey: config.fecApiKey,
@@ -104,128 +119,52 @@ export function registerTools(server: McpServer, config: Config): void {
     timeout: config.fecApiTimeoutMs,
   });
 
-  const toolRegistrations: ToolRegistration[] = [
-    {
-      def: SEARCH_CANDIDATES_TOOL,
-      paramsSchema: searchCandidatesParamsSchema,
-      execute: async (params) =>
-        executeSearchCandidates(client, params as {
-          q: string;
-          election_year?: number;
-          office?: 'H' | 'S' | 'P';
-          state?: string;
-          party?: string;
-        }),
-    },
-    {
-      def: GET_COMMITTEE_FINANCES_TOOL,
-      paramsSchema: getCommitteeFinancesParamsSchema,
-      execute: async (params) =>
-        executeGetCommitteeFinances(client, params as {
-          committee_id: string;
-          cycle?: number;
-        }),
-    },
-    {
-      def: GET_RECEIPTS_TOOL,
-      paramsSchema: getReceiptsParamsSchema,
-      execute: async (params) =>
-        executeGetReceipts(client, params as {
-          committee_id: string;
-          min_amount?: number;
-          two_year_transaction_period?: number;
-          cycle?: number;
-          contributor_type?: 'individual' | 'committee';
-          include_notable?: boolean;
-          fuzzy_threshold?: number;
-          limit?: number;
-          sort_by?: 'amount' | 'date';
-        }),
-    },
-    {
-      def: GET_DISBURSEMENTS_TOOL,
-      paramsSchema: getDisbursementsParamsSchema,
-      execute: async (params) =>
-        executeGetDisbursements(client, params as {
-          committee_id: string;
-          min_amount?: number;
-          two_year_transaction_period?: number;
-          cycle?: number;
-          purpose?: string;
-          include_notable?: boolean;
-          fuzzy_threshold?: number;
-          limit?: number;
-          sort_by?: 'amount' | 'date';
-        }),
-    },
-    {
-      def: GET_INDEPENDENT_EXPENDITURES_TOOL,
-      paramsSchema: getIndependentExpendituresParamsSchema,
-      execute: async (params) =>
-        executeGetIndependentExpenditures(client, params as {
-          candidate_id?: string;
-          committee_id?: string;
-          support_oppose?: 'support' | 'oppose';
-          min_amount?: number;
-          cycle?: number;
-          limit?: number;
-        }),
-    },
-    {
-      def: GET_COMMITTEE_FLAGS_TOOL,
-      paramsSchema: getCommitteeFlagsParamsSchema,
-      execute: async (params) =>
-        executeGetCommitteeFlags(client, params as {
-          committee_id: string;
-          cycle?: number;
-        }),
-    },
-    {
-      def: SEARCH_DONORS_TOOL,
-      paramsSchema: searchDonorsParamsSchema,
-      execute: async (params) =>
-        executeSearchDonors(client, params as {
-          contributor_name?: string;
-          contributor_employer?: string;
-          contributor_occupation?: string;
-          contributor_state?: string;
-          min_amount?: number;
-          cycle?: number;
-          limit?: number;
-        }),
-    },
-    {
-      def: SEARCH_SPENDING_TOOL,
-      paramsSchema: searchSpendingParamsSchema,
-      execute: async (params) =>
-        executeSearchSpending(client, params as {
-          description?: string;
-          recipient_name?: string;
-          recipient_state?: string;
-          min_amount?: number;
-          cycle?: number;
-          limit?: number;
-        }),
-    },
-  ];
-
-  for (const { def, paramsSchema, execute } of toolRegistrations) {
-    server.tool(
-      def.name,
-      def.description,
-      def.inputSchema,
-      async (params): Promise<ToolResult> => {
-        try {
-          const validatedParams = await paramsSchema.parseAsync(params);
-          const result = await execute(validatedParams);
-          return { ...result } as ToolResult;
-        } catch (error) {
-          return {
-            content: [{ type: 'text', text: formatErrorForToolResponse(error) }],
-            isError: true,
-          };
-        }
-      }
-    );
-  }
+  registerValidatedTool(
+    server,
+    SEARCH_CANDIDATES_TOOL,
+    searchCandidatesParamsSchema,
+    (params) => executeSearchCandidates(client, params)
+  );
+  registerValidatedTool(
+    server,
+    GET_COMMITTEE_FINANCES_TOOL,
+    getCommitteeFinancesParamsSchema,
+    (params) => executeGetCommitteeFinances(client, params)
+  );
+  registerValidatedTool(
+    server,
+    GET_RECEIPTS_TOOL,
+    getReceiptsParamsSchema,
+    (params) => executeGetReceipts(client, params)
+  );
+  registerValidatedTool(
+    server,
+    GET_DISBURSEMENTS_TOOL,
+    getDisbursementsParamsSchema,
+    (params) => executeGetDisbursements(client, params)
+  );
+  registerValidatedTool(
+    server,
+    GET_INDEPENDENT_EXPENDITURES_TOOL,
+    getIndependentExpendituresParamsSchema,
+    (params) => executeGetIndependentExpenditures(client, params)
+  );
+  registerValidatedTool(
+    server,
+    GET_COMMITTEE_FLAGS_TOOL,
+    getCommitteeFlagsParamsSchema,
+    (params) => executeGetCommitteeFlags(client, params)
+  );
+  registerValidatedTool(
+    server,
+    SEARCH_DONORS_TOOL,
+    searchDonorsParamsSchema,
+    (params) => executeSearchDonors(client, params)
+  );
+  registerValidatedTool(
+    server,
+    SEARCH_SPENDING_TOOL,
+    searchSpendingParamsSchema,
+    (params) => executeSearchSpending(client, params)
+  );
 }

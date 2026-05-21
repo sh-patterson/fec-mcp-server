@@ -58,9 +58,9 @@ export async function executeGetReceipts(
     // Get unique PAC committee IDs for enrichment
     const pacCommitteeIds = [
       ...new Set(
-        response.results
-          .filter(r => r.contributor_committee_id)
-          .map(r => r.contributor_committee_id as string)
+        response.results.flatMap((record) =>
+          record.contributor_committee_id ? [record.contributor_committee_id] : []
+        )
       ),
     ];
 

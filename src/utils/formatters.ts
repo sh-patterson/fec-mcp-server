@@ -151,11 +151,8 @@ export function transformScheduleB(record: FECScheduleB): FormattedDisbursement 
   };
 }
 
-/**
- * Format financial summary as readable text
- */
-export function formatFinancialSummaryText(summary: CommitteeFinancialSummary): string {
-  const lines: string[] = [
+function buildFinancialSummaryLines(summary: CommitteeFinancialSummary): string[] {
+  const lines = [
     `## ${summary.committee_name}`,
     `**Committee ID:** ${summary.committee_id}`,
     `**Report:** ${summary.report_type}`,
@@ -184,7 +181,14 @@ export function formatFinancialSummaryText(summary: CommitteeFinancialSummary): 
   lines.push(`- **PAC Contributions:** ${formatCurrency(summary.pac_contributions)}`);
   lines.push(`- **Party Contributions:** ${formatCurrency(summary.party_contributions)}`);
 
-  return lines.join('\n');
+  return lines;
+}
+
+/**
+ * Format financial summary as readable text
+ */
+export function formatFinancialSummaryText(summary: CommitteeFinancialSummary): string {
+  return buildFinancialSummaryLines(summary).join('\n');
 }
 
 /**
@@ -306,35 +310,7 @@ export function classifyPAC(committee: FECCommittee): PACClassification {
  * Format enhanced financial summary with loans and debts
  */
 export function formatEnhancedFinancialSummaryText(summary: EnhancedFinancialSummary): string {
-  // Start with base financial summary
-  const lines: string[] = [
-    `## ${summary.committee_name}`,
-    `**Committee ID:** ${summary.committee_id}`,
-    `**Report:** ${summary.report_type}`,
-    `**Period:** ${formatDate(summary.coverage_period.start)} - ${formatDate(summary.coverage_period.end)}`,
-    '',
-    '### Financial Summary',
-    `- **Total Receipts:** ${formatCurrency(summary.total_receipts)}`,
-    `- **Total Disbursements:** ${formatCurrency(summary.total_disbursements)}`,
-    `- **Cash on Hand:** ${formatCurrency(summary.cash_on_hand)}`,
-    `- **Debts Owed:** ${formatCurrency(summary.debts_owed)}`,
-  ];
-
-  if (summary.burn_rate !== null) {
-    lines.push(`- **Burn Rate:** ${summary.burn_rate.toFixed(2)} (${summary.burn_rate > 1 ? 'spending more than raising' : 'raising more than spending'})`);
-  }
-
-  lines.push('', '### Contribution Breakdown');
-  lines.push(`- **Individual Contributions:** ${formatCurrency(summary.individual_contributions)}`);
-  lines.push(`  - Itemized (>${formatCurrency(200)}): ${formatCurrency(summary.individual_itemized)}`);
-  lines.push(`  - Unitemized (<${formatCurrency(200)}): ${formatCurrency(summary.individual_unitemized)}`);
-
-  if (summary.small_donor_percentage !== null) {
-    lines.push(`  - Small Donor %: ${summary.small_donor_percentage.toFixed(1)}%`);
-  }
-
-  lines.push(`- **PAC Contributions:** ${formatCurrency(summary.pac_contributions)}`);
-  lines.push(`- **Party Contributions:** ${formatCurrency(summary.party_contributions)}`);
+  const lines = buildFinancialSummaryLines(summary);
 
   // Add loans section
   if (summary.loans.length > 0) {
