@@ -85,7 +85,7 @@ describe('get_committee_flags tool', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    expect(result.content[0].text).toContain('Compliance Review');
+    expect(result.content[0].text).toContain('Filing review signals');
     expect(result.content[0].text).toContain('RFAIs');
     expect(result.content[0].text).toContain('Amendments');
   });
@@ -113,7 +113,7 @@ describe('get_committee_flags tool', () => {
       expect.objectContaining({
         committee_id: 'C00523969',
         cycle: 2024,
-        document_type: 'RFAI',
+        form_type: 'RFAI',
         limit: 20,
       })
     );

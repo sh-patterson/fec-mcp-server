@@ -87,8 +87,7 @@ describe('search_candidates tool', () => {
     });
 
     expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ election_year: 2024 }),
-      60000
+      expect.objectContaining({ election_year: 2024 })
     );
   });
 
@@ -99,6 +98,6 @@ describe('search_candidates tool', () => {
 
     await executeSearchCandidates(mockClient, { q: 'Smith', office: 'S' });
 
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ office: 'S' }), 60000);
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ office: 'S' }));
   });
 });

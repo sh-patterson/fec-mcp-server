@@ -16,7 +16,6 @@ export const getCommitteeFlagsInputSchema = {
     .number()
     .int()
     .min(2000)
-    .max(2030)
     .optional()
     .describe('Two-year election cycle to check (e.g., 2024)'),
 };

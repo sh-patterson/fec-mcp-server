@@ -4,11 +4,24 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { createRequire } from 'node:module';
 import { registerTools } from './tools/index.js';
 import type { Config } from './config.js';
 
 const SERVER_NAME = 'fec-mcp-server';
-const SERVER_VERSION = '1.0.0';
+const require = createRequire(import.meta.url);
+const packageJson: unknown = require('../package.json');
+
+if (
+  typeof packageJson !== 'object' ||
+  packageJson === null ||
+  !('version' in packageJson) ||
+  typeof packageJson.version !== 'string'
+) {
+  throw new Error('package.json must contain a string version.');
+}
+
+const SERVER_VERSION = packageJson.version;
 
 /**
  * Create and configure the MCP server

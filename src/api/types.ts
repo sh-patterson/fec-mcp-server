@@ -93,6 +93,28 @@ export interface FECCommitteeReport {
   total_disbursements_ytd: number;
 }
 
+// Cycle totals from /committee/{id}/totals/.
+export interface FECCommitteeTotals {
+  committee_id: string;
+  cycle: number;
+  coverage_start_date: string | null;
+  coverage_end_date: string | null;
+  receipts: number | null;
+  disbursements: number | null;
+  individual_contributions: number | null;
+  individual_itemized_contributions: number | null;
+  individual_unitemized_contributions: number | null;
+  other_political_committee_contributions: number | null;
+  political_party_committee_contributions: number | null;
+  loans?: number | null;
+  loans_received?: number | null;
+  loans_received_from_candidate?: number | null;
+  candidate_contribution?: number | null;
+  all_other_loans?: number | null;
+  last_cash_on_hand_end_period?: number | null;
+  last_debts_owed_by_committee?: number | null;
+}
+
 // Schedule A - Itemized receipts/contributions
 export interface FECScheduleA {
   committee_id: string;
@@ -159,31 +181,38 @@ export interface FECScheduleB {
   recipient_committee_id: string | null;
 }
 
-// Calculated financial summary (our derived type)
+export interface CycleFinancialTotals {
+  cycle: number;
+  coverage_start_date: string | null;
+  coverage_end_date: string | null;
+  receipts: number | null;
+  disbursements: number | null;
+  individual_contributions: number | null;
+  individual_itemized_contributions: number | null;
+  individual_unitemized_contributions: number | null;
+  pac_contributions: number | null;
+  party_contributions: number | null;
+  loans: number | null;
+  candidate_loans: number | null;
+}
+
+export interface LatestReportBalances {
+  report_type: string;
+  coverage_start_date: string;
+  coverage_end_date: string;
+  cash_on_hand: number | null;
+  debts_owed_by_committee: number | null;
+  debts_owed_to_committee: number | null;
+}
+
+// Explicit cycle totals and latest final-report balances.
 export interface CommitteeFinancialSummary {
   committee_id: string;
   committee_name: string;
-  report_type: string;
-  coverage_period: {
-    start: string;
-    end: string;
-  };
-  cycle: number;
-  // Core financials
-  total_receipts: number;
-  total_disbursements: number;
-  cash_on_hand: number;
-  debts_owed: number;
-  // Calculated metrics
-  burn_rate: number | null; // disbursements / receipts, null if receipts = 0
-  // Contribution breakdown
-  individual_contributions: number;
-  individual_itemized: number;
-  individual_unitemized: number;
-  pac_contributions: number;
-  party_contributions: number;
-  // Derived percentages
-  small_donor_percentage: number | null; // unitemized / total_receipts
+  cycle_totals: CycleFinancialTotals;
+  latest_report_balances: LatestReportBalances;
+  cycle_burn_rate: number | null;
+  cycle_unitemized_share: number | null;
 }
 
 // Formatted receipt for tool output
@@ -306,6 +335,7 @@ export interface FECFiling {
   report_type_full: string | null;
   document_type: string;
   document_type_full: string;
+  document_description?: string | null;
   amendment_indicator: string | null;
   receipt_date: string;
   coverage_start_date: string | null;
@@ -315,26 +345,6 @@ export interface FECFiling {
   // For RFAIs
   request_type: string | null;
   is_amended: boolean;
-}
-
-// Enhanced financial summary with loans and debts
-export interface EnhancedFinancialSummary extends CommitteeFinancialSummary {
-  // Loans (Schedule C)
-  total_loans: number;
-  candidate_loans: number;
-  loans: Array<{
-    source: string;
-    amount: number;
-    balance: number;
-    date: string;
-    is_candidate_loan: boolean;
-  }>;
-  // Debts (Schedule D)
-  debts: Array<{
-    creditor: string;
-    amount: number;
-    nature: string | null;
-  }>;
 }
 
 // PAC classification for enriched receipts
@@ -359,19 +369,19 @@ export interface EnrichedReceipt extends FormattedReceipt {
   pac_classification: PACClassification | null;
 }
 
-// Committee flags/red flags
-export interface CommitteeFlags {
+// Filing records that merit human review. These are not violation findings.
+export interface CommitteeFilingReview {
   committee_id: string;
   committee_name: string;
   has_rfais: boolean;
   rfai_count: number;
-  has_late_filings: boolean;
-  late_filing_count: number;
   has_amendments: boolean;
   amendment_count: number;
-  recent_issues: Array<{
-    type: 'rfai' | 'late_filing' | 'amendment';
+  signals: Array<{
+    type: 'rfai' | 'amendment';
     date: string;
     description: string;
+    file_number: number;
+    document_url: string | null;
   }>;
 }

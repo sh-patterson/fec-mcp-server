@@ -43,6 +43,7 @@ describe('get_disbursements tool', () => {
 
     const result = await executeGetDisbursements(mockClient, {
       committee_id: 'C00523969',
+      include_notable: true,
     });
 
     expect(result.content[0].text).toContain('ADVERTISING');
@@ -125,10 +126,10 @@ describe('get_disbursements tool', () => {
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({ two_year_transaction_period: 2024 })
     );
-    expect(result.content[0].text).toContain('2024 cycle (auto-aligned from cycle)');
+    expect(result.content[0].text).toContain('cycle 2024');
   });
 
-  it('should prefer explicit two_year_transaction_period over cycle', async () => {
+  it('should reject conflicting cycle aliases', async () => {
     const spy = vi.spyOn(mockClient, 'getScheduleB').mockResolvedValue(
       mockScheduleBResponse
     );
@@ -139,9 +140,7 @@ describe('get_disbursements tool', () => {
       two_year_transaction_period: 2022,
     });
 
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ two_year_transaction_period: 2022 })
-    );
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('should default to sorting by amount', async () => {

@@ -7,6 +7,7 @@ import type { FECClient } from '../api/client.js';
 import { searchSpendingInputSchema } from '../schemas/search-spending.schema.js';
 import { formatErrorForToolResponse } from '../utils/errors.js';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
+import { formatCycleFilter } from '../utils/filters.js';
 
 export const SEARCH_SPENDING_TOOL = {
   name: 'search_spending',
@@ -31,14 +32,15 @@ export async function executeSearchSpending(
   }
 ): Promise<SearchSpendingResult> {
   try {
+    const minimumAmount = params.min_amount ?? 500;
     const response = await client.searchSpending({
       description: params.description,
       recipient_name: params.recipient_name,
       recipient_state: params.recipient_state,
-      min_amount: params.min_amount ?? 500, // Default to $500 to filter noise
+      min_amount: minimumAmount,
       two_year_transaction_period: params.cycle,
       limit: params.limit ?? 20,
-    }, 60_000);
+    });
 
     // Build header
     const lines: string[] = ['## Spending Search Results'];
@@ -48,8 +50,10 @@ export async function executeSearchSpending(
     if (params.description) criteria.push(`description: "${params.description}"`);
     if (params.recipient_name) criteria.push(`recipient: "${params.recipient_name}"`);
     if (params.recipient_state) criteria.push(`state: ${params.recipient_state}`);
-    if (params.min_amount) criteria.push(`minimum: ${formatCurrency(params.min_amount)}`);
-    if (params.cycle) criteria.push(`cycle: ${params.cycle}`);
+    criteria.push(`minimum: ${formatCurrency(minimumAmount)}`);
+    criteria.push(formatCycleFilter(params.cycle).replace('cycle ', 'cycle: '));
+    criteria.push('type: all');
+    criteria.push('sort: amount');
 
     lines.push(`*Search: ${criteria.join(', ')}*`);
     lines.push(`*Found ${response.pagination.count} disbursements, showing ${response.results.length}*`);

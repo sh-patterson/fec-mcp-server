@@ -41,15 +41,16 @@ export class FECApiError extends Error {
 }
 
 export class RateLimitError extends FECApiError {
-  public readonly retryAfter?: number;
+  public readonly retryAfter?: string;
 
-  constructor(retryAfter?: number) {
-    const message = retryAfter
-      ? `FEC API rate limit exceeded. Retry after ${retryAfter} seconds.`
+  constructor(retryAfter?: string | number) {
+    const normalizedRetryAfter = retryAfter === undefined ? undefined : String(retryAfter);
+    const message = normalizedRetryAfter
+      ? `FEC API rate limit exceeded. Retry-After: ${normalizedRetryAfter}${/^\d+$/.test(normalizedRetryAfter) ? ' seconds' : ''}.`
       : 'FEC API rate limit exceeded.';
     super(message, 429);
     this.name = 'RateLimitError';
-    this.retryAfter = retryAfter;
+    this.retryAfter = normalizedRetryAfter;
   }
 }
 
@@ -83,7 +84,7 @@ export function formatErrorForToolResponse(error: unknown): string {
   let message: string;
 
   if (error instanceof RateLimitError) {
-    message = 'Rate limit exceeded. The FEC API has request limits. Please wait a moment and try again.';
+    message = error.message;
     return sanitizeApiKey(message, apiKey);
   }
 
@@ -93,7 +94,12 @@ export function formatErrorForToolResponse(error: unknown): string {
   }
 
   if (error instanceof FECApiError) {
-    message = `FEC API error: ${error.message}`;
+    const detail = error.message.replace(/^FEC API error:\s*/i, '');
+    if (error.statusCode === 504) {
+      message = `FEC API error: ${detail} Use narrower filters and try a new request.`;
+    } else {
+      message = `FEC API error: ${detail}`;
+    }
     return sanitizeApiKey(message, apiKey);
   }
 

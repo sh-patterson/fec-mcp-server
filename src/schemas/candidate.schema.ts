@@ -14,7 +14,6 @@ export const searchCandidatesInputSchema = {
     .number()
     .int()
     .min(1980, 'Election year must be 1980 or later')
-    .max(2030, 'Election year must be 2030 or earlier')
     .optional()
     .describe('Filter by election year (e.g., 2024)'),
 

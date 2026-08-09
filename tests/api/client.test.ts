@@ -95,7 +95,7 @@ describe('FECClient', () => {
         await client.get('/candidates/search/');
       } catch (error) {
         expect(error).toBeInstanceOf(RateLimitError);
-        expect((error as RateLimitError).retryAfter).toBe(15);
+        expect((error as RateLimitError).retryAfter).toBe('15');
       }
     });
 
@@ -329,6 +329,20 @@ describe('FECClient', () => {
 
       const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('is_individual=true');
+    });
+
+    it('should filter non-individual contributors without claiming they are all committees', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse(mockScheduleAResponse)
+      );
+
+      await client.getScheduleA({
+        committee_id: 'C00523969',
+        contributor_type: 'non_individual',
+      });
+
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
+      expect(calledUrl).toContain('is_individual=false');
     });
   });
 

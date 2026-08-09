@@ -6,6 +6,7 @@
 import type { FECClient } from '../api/client.js';
 import { getDisbursementsInputSchema } from '../schemas/disbursements.schema.js';
 import { formatErrorForToolResponse } from '../utils/errors.js';
+import { formatCycleFilter, resolveTransactionPeriod } from '../utils/filters.js';
 import { transformScheduleB, formatDisbursementsText } from '../utils/formatters.js';
 import { loadReferenceData } from '../notable/reference-data.js';
 import { classifyNotableDisbursements } from '../notable/classifier.js';
@@ -37,17 +38,22 @@ export async function executeGetDisbursements(
   }
 ): Promise<GetDisbursementsResult> {
   try {
-    const transactionPeriod = params.two_year_transaction_period ?? params.cycle;
-    const includeNotable = params.include_notable ?? true;
+    const transactionPeriod = resolveTransactionPeriod(
+      params.two_year_transaction_period,
+      params.cycle
+    );
+    const includeNotable = params.include_notable ?? false;
     const fuzzyThreshold = params.fuzzy_threshold ?? 90;
+    const minimumAmount = params.min_amount ?? 1000;
+    const sortBy = params.sort_by ?? 'amount';
 
     const response = await client.getScheduleB({
       committee_id: params.committee_id,
-      min_amount: params.min_amount ?? 1000,
+      min_amount: minimumAmount,
       two_year_transaction_period: transactionPeriod,
       purpose: params.purpose,
       limit: params.limit ?? 20,
-      sort_by: params.sort_by ?? 'amount',
+      sort_by: sortBy,
     });
 
     // Transform to formatted disbursements
@@ -66,24 +72,13 @@ export async function executeGetDisbursements(
     }
 
     // Add filter info
-    const filters: string[] = [];
-    if (params.min_amount) {
-      filters.push(`minimum $${params.min_amount.toLocaleString()}`);
-    }
-    if (params.purpose) {
-      filters.push(`purpose contains "${params.purpose}"`);
-    }
-    if (transactionPeriod) {
-      filters.push(
-        params.two_year_transaction_period
-          ? `${transactionPeriod} cycle`
-          : `${transactionPeriod} cycle (auto-aligned from cycle)`
-      );
-    }
-
-    if (filters.length > 0) {
-      lines.push(`*Filters: ${filters.join(', ')}*`);
-    }
+    const filters = [
+      `minimum $${minimumAmount.toLocaleString()}`,
+      formatCycleFilter(transactionPeriod),
+      `purpose ${params.purpose ? `contains "${params.purpose}"` : 'all'}`,
+      `sort ${sortBy}`,
+    ];
+    lines.push(`*Filters: ${filters.join('; ')}*`);
 
     lines.push(`*Showing ${disbursements.length} of ${response.pagination.count} results*`);
     lines.push('');
@@ -96,6 +91,9 @@ export async function executeGetDisbursements(
         referenceData,
         fuzzyThreshold
       );
+      lines.push('### Third-party analyst enrichment');
+      lines.push('*Opt-in matches from the packaged analyst reference data. Review the provenance manifest before use.*');
+      lines.push('');
       lines.push(formatNotableDisbursementsText(notableItems, Math.min(params.limit ?? 20, 10)));
       lines.push('');
     }

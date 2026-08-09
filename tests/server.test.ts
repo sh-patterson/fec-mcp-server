@@ -26,6 +26,6 @@ describe('createServer', () => {
     expect(server).toBeDefined();
     expect(registerToolsMock).toHaveBeenCalledWith(server, config);
     expect(SERVER_NAME).toBe('fec-mcp-server');
-    expect(SERVER_VERSION).toBe('1.0.0');
+    expect(SERVER_VERSION).toBe('1.1.0');
   });
 });

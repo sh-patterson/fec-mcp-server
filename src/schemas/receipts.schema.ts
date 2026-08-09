@@ -23,7 +23,6 @@ export const getReceiptsInputSchema = {
     .number()
     .int()
     .min(1980)
-    .max(2030)
     .optional()
     .describe('Two-year period (e.g., 2024 covers 2023-2024).'),
 
@@ -31,20 +30,19 @@ export const getReceiptsInputSchema = {
     .number()
     .int()
     .min(1980)
-    .max(2030)
     .optional()
     .describe('Alias for two_year_transaction_period to align with finance cycle filters.'),
 
   contributor_type: z
-    .enum(['individual', 'committee'])
+    .enum(['individual', 'non_individual', 'committee'])
     .optional()
-    .describe('Filter by contributor type: "individual" or "committee" (PAC)'),
+    .describe('Filter by contributor type. "committee" is a legacy alias for "non_individual".'),
 
   include_notable: z
     .boolean()
     .optional()
-    .default(true)
-    .describe('Include flagged-first notable analysis block in output (default: true)'),
+    .default(false)
+    .describe('Include third-party analyst enrichment (default: false)'),
 
   fuzzy_threshold: z
     .number()
@@ -71,6 +69,19 @@ export const getReceiptsInputSchema = {
     .describe('Sort results by "amount" (descending) or "date" (most recent first)'),
 };
 
-export const getReceiptsParamsSchema = z.object(getReceiptsInputSchema);
+export const getReceiptsParamsSchema = z
+  .object(getReceiptsInputSchema)
+  .superRefine((value, ctx) => {
+    if (
+      value.cycle !== undefined &&
+      value.two_year_transaction_period !== undefined &&
+      value.cycle !== value.two_year_transaction_period
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Conflicting cycle aliases: cycle and two_year_transaction_period must match.',
+      });
+    }
+  });
 
 export type GetReceiptsInput = z.infer<typeof getReceiptsParamsSchema>;

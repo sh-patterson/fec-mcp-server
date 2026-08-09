@@ -50,8 +50,7 @@ describe('search_spending tool', () => {
         recipient_state: 'DC',
         two_year_transaction_period: 2024,
         limit: 5,
-      }),
-      60000
+      })
     );
   });
 
