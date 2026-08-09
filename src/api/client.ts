@@ -10,6 +10,7 @@ import type {
   FECCandidate,
   FECCommittee,
   FECCommitteeReport,
+  FECCommitteeTotals,
   FECScheduleA,
   FECScheduleB,
   FECScheduleC,
@@ -36,11 +37,15 @@ export interface GetCommitteeReportsParams {
   cycle?: number;
 }
 
+export interface GetCommitteeTotalsParams {
+  cycle?: number;
+}
+
 export interface GetScheduleAParams {
   committee_id: string;
   min_amount?: number;
   two_year_transaction_period?: number;
-  contributor_type?: 'individual' | 'committee';
+  contributor_type?: 'individual' | 'non_individual' | 'committee';
   limit?: number;
   sort_by?: 'amount' | 'date';
 }
@@ -189,13 +194,11 @@ export class FECClient {
 
       if (!response.ok) {
         if (response.status === 429) {
-          const retryAfterHeader = response.headers.get('Retry-After');
-          const retryAfter = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : NaN;
-          throw new RateLimitError(Number.isNaN(retryAfter) ? undefined : retryAfter);
+          throw new RateLimitError(response.headers.get('Retry-After') ?? undefined);
         }
         const errorText = sanitizeApiKey(await response.text(), this.apiKey);
         throw new FECApiError(
-          `FEC API error: ${response.status} ${response.statusText}. ${errorText}`,
+          `${response.status} ${response.statusText}. ${errorText}`,
           response.status,
           endpoint
         );
@@ -247,7 +250,19 @@ export class FECClient {
   ): Promise<FECApiResponse<FECCommitteeReport>> {
     return this.get<FECCommitteeReport>(ENDPOINTS.COMMITTEE_REPORTS(committeeId), {
       cycle: params?.cycle,
+      is_amended: false,
       sort: '-coverage_end_date',
+      per_page: DEFAULT_PER_PAGE,
+    });
+  }
+
+  async getCommitteeTotals(
+    committeeId: string,
+    params?: GetCommitteeTotalsParams
+  ): Promise<FECApiResponse<FECCommitteeTotals>> {
+    return this.get<FECCommitteeTotals>(ENDPOINTS.COMMITTEE_TOTALS(committeeId), {
+      cycle: params?.cycle,
+      sort: '-cycle',
       per_page: DEFAULT_PER_PAGE,
     });
   }
@@ -272,7 +287,10 @@ export class FECClient {
     // Filter by contributor type
     if (params.contributor_type === 'individual') {
       queryParams.is_individual = true;
-    } else if (params.contributor_type === 'committee') {
+    } else if (
+      params.contributor_type === 'non_individual' ||
+      params.contributor_type === 'committee'
+    ) {
       queryParams.is_individual = false;
     }
 

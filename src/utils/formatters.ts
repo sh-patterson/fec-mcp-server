@@ -4,14 +4,12 @@
 
 import type {
   FECCommitteeReport,
+  FECCommitteeTotals,
   FECScheduleA,
   FECScheduleB,
-  FECScheduleC,
-  FECScheduleD,
   FECScheduleE,
   FECCommittee,
   CommitteeFinancialSummary,
-  EnhancedFinancialSummary,
   FormattedReceipt,
   FormattedDisbursement,
   PACClassification,
@@ -84,39 +82,57 @@ export function calculateSmallDonorPercentage(
 }
 
 /**
- * Transform FEC committee report to our summary format
+ * Combine cycle totals with the latest final report balances.
  */
-export function transformCommitteeReport(report: FECCommitteeReport): CommitteeFinancialSummary {
-  const burnRate = calculateBurnRate(
-    report.total_receipts_period,
-    report.total_disbursements_period
-  );
-
-  const smallDonorPercentage = calculateSmallDonorPercentage(
-    report.individual_unitemized_contributions_period,
-    report.total_receipts_period
-  );
+export function transformCommitteeFinancials(
+  totals: FECCommitteeTotals,
+  report: FECCommitteeReport
+): CommitteeFinancialSummary {
+  const loans =
+    totals.loans ??
+    totals.loans_received ??
+    (totals.loans_received_from_candidate !== undefined || totals.all_other_loans !== undefined
+      ? (totals.loans_received_from_candidate ?? 0) + (totals.all_other_loans ?? 0)
+      : null);
 
   return {
     committee_id: report.committee_id,
     committee_name: report.committee_name,
-    report_type: report.report_type_full,
-    coverage_period: {
-      start: report.coverage_start_date,
-      end: report.coverage_end_date,
+    cycle_totals: {
+      cycle: totals.cycle,
+      coverage_start_date: totals.coverage_start_date,
+      coverage_end_date: totals.coverage_end_date,
+      receipts: totals.receipts,
+      disbursements: totals.disbursements,
+      individual_contributions: totals.individual_contributions,
+      individual_itemized_contributions: totals.individual_itemized_contributions,
+      individual_unitemized_contributions: totals.individual_unitemized_contributions,
+      pac_contributions: totals.other_political_committee_contributions,
+      party_contributions: totals.political_party_committee_contributions,
+      loans,
+      candidate_loans:
+        totals.loans_received_from_candidate ?? totals.candidate_contribution ?? null,
     },
-    cycle: report.cycle,
-    total_receipts: report.total_receipts_period ?? 0,
-    total_disbursements: report.total_disbursements_period ?? 0,
-    cash_on_hand: report.cash_on_hand_end_period ?? 0,
-    debts_owed: report.debts_owed_by_committee ?? 0,
-    burn_rate: burnRate,
-    individual_contributions: report.individual_contributions_period ?? 0,
-    individual_itemized: report.individual_itemized_contributions_period ?? 0,
-    individual_unitemized: report.individual_unitemized_contributions_period ?? 0,
-    pac_contributions: report.other_political_committee_contributions_period ?? 0,
-    party_contributions: report.political_party_committee_contributions_period ?? 0,
-    small_donor_percentage: smallDonorPercentage,
+    latest_report_balances: {
+      report_type: report.report_type_full,
+      coverage_start_date: report.coverage_start_date,
+      coverage_end_date: report.coverage_end_date,
+      cash_on_hand: report.cash_on_hand_end_period ?? null,
+      debts_owed_by_committee: report.debts_owed_by_committee ?? null,
+      debts_owed_to_committee: report.debts_owed_to_committee ?? null,
+    },
+    cycle_burn_rate:
+      totals.receipts !== null && totals.disbursements !== null
+        ? calculateBurnRate(totals.receipts, totals.disbursements)
+        : null,
+    cycle_unitemized_share:
+      totals.individual_unitemized_contributions !== null &&
+      totals.individual_contributions !== null
+        ? calculateSmallDonorPercentage(
+            totals.individual_unitemized_contributions,
+            totals.individual_contributions
+          )
+        : null,
   };
 }
 
@@ -151,35 +167,56 @@ export function transformScheduleB(record: FECScheduleB): FormattedDisbursement 
   };
 }
 
+function formatReportedCurrency(amount: number | null): string {
+  return amount === null ? 'Not reported' : formatCurrency(amount);
+}
+
+function formatCoverage(start: string | null, end: string | null): string {
+  if (!start || !end) {
+    return 'Not reported';
+  }
+  return `${formatDate(start)} - ${formatDate(end)}`;
+}
+
 function buildFinancialSummaryLines(summary: CommitteeFinancialSummary): string[] {
+  const cycle = summary.cycle_totals;
+  const latest = summary.latest_report_balances;
   const lines = [
     `## ${summary.committee_name}`,
     `**Committee ID:** ${summary.committee_id}`,
-    `**Report:** ${summary.report_type}`,
-    `**Period:** ${formatDate(summary.coverage_period.start)} - ${formatDate(summary.coverage_period.end)}`,
     '',
-    '### Financial Summary',
-    `- **Total Receipts:** ${formatCurrency(summary.total_receipts)}`,
-    `- **Total Disbursements:** ${formatCurrency(summary.total_disbursements)}`,
-    `- **Cash on Hand:** ${formatCurrency(summary.cash_on_hand)}`,
-    `- **Debts Owed:** ${formatCurrency(summary.debts_owed)}`,
+    `### Cycle totals (${cycle.cycle})`,
+    `**Cycle coverage:** ${formatCoverage(cycle.coverage_start_date, cycle.coverage_end_date)}`,
+    `- **Cycle total receipts:** ${formatReportedCurrency(cycle.receipts)}`,
+    `- **Cycle total disbursements:** ${formatReportedCurrency(cycle.disbursements)}`,
+    `- **Cycle total individual contributions:** ${formatReportedCurrency(cycle.individual_contributions)}`,
+    `  - **Cycle total itemized individual contributions:** ${formatReportedCurrency(cycle.individual_itemized_contributions)}`,
+    `  - **Cycle total unitemized individual contributions:** ${formatReportedCurrency(cycle.individual_unitemized_contributions)}`,
+    `- **Cycle total other political committee contributions:** ${formatReportedCurrency(cycle.pac_contributions)}`,
+    `- **Cycle total party committee contributions:** ${formatReportedCurrency(cycle.party_contributions)}`,
+    `- **Cycle total loans:** ${formatReportedCurrency(cycle.loans)}`,
+    `- **Cycle total candidate loans or contributions:** ${formatReportedCurrency(cycle.candidate_loans)}`,
   ];
 
-  if (summary.burn_rate !== null) {
-    lines.push(`- **Burn Rate:** ${summary.burn_rate.toFixed(2)} (${summary.burn_rate > 1 ? 'spending more than raising' : 'raising more than spending'})`);
+  if (summary.cycle_burn_rate !== null) {
+    lines.push(`- **Derived cycle burn rate:** ${summary.cycle_burn_rate.toFixed(2)}`);
   }
 
-  lines.push('', '### Contribution Breakdown');
-  lines.push(`- **Individual Contributions:** ${formatCurrency(summary.individual_contributions)}`);
-  lines.push(`  - Itemized (>${formatCurrency(200)}): ${formatCurrency(summary.individual_itemized)}`);
-  lines.push(`  - Unitemized (<${formatCurrency(200)}): ${formatCurrency(summary.individual_unitemized)}`);
-
-  if (summary.small_donor_percentage !== null) {
-    lines.push(`  - Small Donor %: ${summary.small_donor_percentage.toFixed(1)}%`);
+  if (summary.cycle_unitemized_share !== null) {
+    lines.push(
+      `- **Derived cycle unitemized share of individual contributions:** ${summary.cycle_unitemized_share.toFixed(1)}%`
+    );
   }
 
-  lines.push(`- **PAC Contributions:** ${formatCurrency(summary.pac_contributions)}`);
-  lines.push(`- **Party Contributions:** ${formatCurrency(summary.party_contributions)}`);
+  lines.push(
+    '',
+    '### Latest final report balances',
+    `**Latest final report:** ${latest.report_type}`,
+    `**Report period:** ${formatCoverage(latest.coverage_start_date, latest.coverage_end_date)}`,
+    `- **Latest-report cash balance:** ${formatReportedCurrency(latest.cash_on_hand)}`,
+    `- **Latest-report debt owed by committee:** ${formatReportedCurrency(latest.debts_owed_by_committee)}`,
+    `- **Latest-report debt owed to committee:** ${formatReportedCurrency(latest.debts_owed_to_committee)}`
+  );
 
   return lines;
 }
@@ -261,30 +298,6 @@ export function formatDisbursementsText(disbursements: FormattedDisbursement[], 
 }
 
 /**
- * Transform Schedule C loans to our enhanced format
- */
-export function transformLoans(loans: FECScheduleC[]): EnhancedFinancialSummary['loans'] {
-  return loans.map(loan => ({
-    source: loan.loan_source_name,
-    amount: loan.original_loan_amount,
-    balance: loan.loan_balance,
-    date: loan.incurred_date,
-    is_candidate_loan: loan.personally_funded || !!loan.candidate_name,
-  }));
-}
-
-/**
- * Transform Schedule D debts to our enhanced format
- */
-export function transformDebts(debts: FECScheduleD[]): EnhancedFinancialSummary['debts'] {
-  return debts.map(debt => ({
-    creditor: debt.creditor_debtor_name,
-    amount: debt.outstanding_balance_close_of_period,
-    nature: debt.nature_of_debt,
-  }));
-}
-
-/**
  * Classify a PAC based on FEC committee data
  */
 export function classifyPAC(committee: FECCommittee): PACClassification {
@@ -304,42 +317,6 @@ export function classifyPAC(committee: FECCommittee): PACClassification {
     is_trade_pac: orgType === 'T' || orgType === 'M',
     sponsor_candidate: committee.sponsor_candidate_list?.[0]?.candidate_name || null,
   };
-}
-
-/**
- * Format enhanced financial summary with loans and debts
- */
-export function formatEnhancedFinancialSummaryText(summary: EnhancedFinancialSummary): string {
-  const lines = buildFinancialSummaryLines(summary);
-
-  // Add loans section
-  if (summary.loans.length > 0) {
-    lines.push('', '### Loans (Schedule C)');
-    lines.push(`- **Total Loans:** ${formatCurrency(summary.total_loans)}`);
-    lines.push(`- **Candidate Loans:** ${formatCurrency(summary.candidate_loans)}`);
-    lines.push('');
-    summary.loans.forEach((loan, index) => {
-      lines.push(`${index + 1}. **${loan.source}** - ${formatCurrency(loan.amount)}`);
-      lines.push(`   - Balance: ${formatCurrency(loan.balance)}`);
-      lines.push(`   - Date: ${formatDate(loan.date)}`);
-      if (loan.is_candidate_loan) {
-        lines.push(`   - ⚠️ Candidate/Personal Loan`);
-      }
-    });
-  }
-
-  // Add debts section
-  if (summary.debts.length > 0) {
-    lines.push('', '### Debts & Obligations (Schedule D)');
-    summary.debts.forEach((debt, index) => {
-      lines.push(`${index + 1}. **${debt.creditor}** - ${formatCurrency(debt.amount)}`);
-      if (debt.nature) {
-        lines.push(`   - Nature: ${debt.nature}`);
-      }
-    });
-  }
-
-  return lines.join('\n');
 }
 
 /**
@@ -369,12 +346,17 @@ export function formatIndependentExpenditureText(
   const totalSupport = supporting.reduce((sum, e) => sum + e.expenditure_amount, 0);
   const totalOppose = opposing.reduce((sum, e) => sum + e.expenditure_amount, 0);
 
-  lines.push(`**Total Supporting:** ${formatCurrency(totalSupport)} (${supporting.length} expenditures)`);
-  lines.push(`**Total Opposing:** ${formatCurrency(totalOppose)} (${opposing.length} expenditures)`);
+  lines.push(`**Current-page support total:** ${formatCurrency(totalSupport)} (${supporting.length} expenditures)`);
+  lines.push(`**Current-page oppose total:** ${formatCurrency(totalOppose)} (${opposing.length} expenditures)`);
   lines.push('');
 
   expenditures.forEach((exp, index) => {
-    const indicator = exp.support_oppose_indicator === 'S' ? '✓ SUPPORT' : '✗ OPPOSE';
+    const indicator =
+      exp.support_oppose_indicator === 'S'
+        ? 'SUPPORT'
+        : exp.support_oppose_indicator === 'O'
+          ? 'OPPOSE'
+          : 'UNKNOWN';
     lines.push(`${index + 1}. **${exp.committee_name}** - ${formatCurrency(exp.expenditure_amount)} [${indicator}]`);
     if (exp.candidate_name) {
       lines.push(`   - Candidate: ${exp.candidate_name} (${exp.candidate_party || 'Unknown party'})`);

@@ -4,14 +4,14 @@
  */
 
 import type { FECClient } from '../api/client.js';
-import type { CommitteeFlags, FECFiling } from '../api/types.js';
+import type { CommitteeFilingReview, FECFiling } from '../api/types.js';
 import { getCommitteeFlagsInputSchema } from '../schemas/committee-flags.schema.js';
 import { formatErrorForToolResponse, NotFoundError } from '../utils/errors.js';
 import { formatDate } from '../utils/formatters.js';
 
 export const GET_COMMITTEE_FLAGS_TOOL = {
   name: 'get_committee_flags',
-  description: `Check a campaign committee for compliance red flags including RFAIs (Requests for Additional Information from the FEC) and amended filings. Essential for identifying campaign finance compliance issues that merit closer research review.`,
+  description: `Find Requests for Additional Information and amended filings for human review. These filing records are review signals, not violation findings.`,
   inputSchema: getCommitteeFlagsInputSchema,
 };
 
@@ -23,14 +23,17 @@ export interface GetCommitteeFlagsResult {
 /**
  * Analyze filings to extract flags
  */
-function analyzeFilings(filings: FECFiling[]): CommitteeFlags {
+function analyzeFilings(filings: FECFiling[]): CommitteeFilingReview {
   const rfais: FECFiling[] = [];
   const amendments: FECFiling[] = [];
-  const lateFilings: FECFiling[] = [];
 
   for (const filing of filings) {
-    // Check for RFAIs (Request for Additional Information)
-    if (filing.document_type === 'RFAI' || filing.form_type === 'RFAI') {
+    const description = filing.document_description ?? filing.document_type_full;
+    if (
+      filing.form_type === 'RFAI' ||
+      filing.form_type === 'FRQ' ||
+      description.toLowerCase().includes('request for additional information')
+    ) {
       rfais.push(filing);
     }
 
@@ -38,28 +41,30 @@ function analyzeFilings(filings: FECFiling[]): CommitteeFlags {
     if (filing.amendment_indicator && filing.amendment_indicator !== 'N') {
       amendments.push(filing);
     }
-
-    // Note: Late filings would need additional date comparison logic
-    // For now we flag amendments as they often indicate issues
   }
 
-  const recentIssues: CommitteeFlags['recent_issues'] = [];
+  const signals: CommitteeFilingReview['signals'] = [];
 
-  // Add RFAIs to issues
   for (const rfai of rfais.slice(0, 5)) {
-    recentIssues.push({
+    signals.push({
       type: 'rfai',
       date: rfai.receipt_date,
-      description: `RFAI received: ${rfai.document_type_full || 'Request for Additional Information'}`,
+      description:
+        rfai.document_description ||
+        rfai.document_type_full ||
+        'Request for Additional Information',
+      file_number: rfai.file_number,
+      document_url: rfai.pdf_url,
     });
   }
 
-  // Add significant amendments to issues
   for (const amendment of amendments.slice(0, 5)) {
-    recentIssues.push({
+    signals.push({
       type: 'amendment',
       date: amendment.receipt_date,
       description: `Amended filing: ${amendment.form_type} - ${amendment.report_type_full || 'Report'}`,
+      file_number: amendment.file_number,
+      document_url: amendment.pdf_url,
     });
   }
 
@@ -68,11 +73,9 @@ function analyzeFilings(filings: FECFiling[]): CommitteeFlags {
     committee_name: filings[0]?.committee_name || '',
     has_rfais: rfais.length > 0,
     rfai_count: rfais.length,
-    has_late_filings: lateFilings.length > 0,
-    late_filing_count: lateFilings.length,
     has_amendments: amendments.length > 0,
     amendment_count: amendments.length,
-    recent_issues: recentIssues.sort(
+    signals: signals.sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     ),
   };
@@ -81,51 +84,45 @@ function analyzeFilings(filings: FECFiling[]): CommitteeFlags {
 /**
  * Format flags for display
  */
-function formatFlagsText(flags: CommitteeFlags): string {
+function formatFlagsText(review: CommitteeFilingReview): string {
   const lines: string[] = [
-    `## Compliance Review: ${flags.committee_name}`,
-    `**Committee ID:** ${flags.committee_id}`,
+    `## Filing review signals: ${review.committee_name}`,
+    `**Committee ID:** ${review.committee_id}`,
     '',
   ];
 
-  // Overall status
-  const hasIssues = flags.has_rfais || flags.has_amendments;
-  if (!hasIssues) {
-    lines.push('### Status: No Significant Flags');
-    lines.push('No RFAIs or amendments found in the reviewed filings.');
+  const hasSignals = review.has_rfais || review.has_amendments;
+  if (!hasSignals) {
+    lines.push('No RFAIs or amendments were found in the reviewed filing records.');
     return lines.join('\n');
   }
 
-  lines.push('### Flags Summary');
+  lines.push('### Records for review');
 
-  if (flags.has_rfais) {
-    lines.push(`- **RFAIs:** ${flags.rfai_count} request(s) for additional information from FEC`);
+  if (review.has_rfais) {
+    lines.push(`- **RFAIs:** ${review.rfai_count} record(s)`);
   }
 
-  if (flags.has_amendments) {
-    lines.push(`- **Amendments:** ${flags.amendment_count} amended filing(s)`);
+  if (review.has_amendments) {
+    lines.push(`- **Amendments:** ${review.amendment_count} record(s)`);
   }
 
-  if (flags.has_late_filings) {
-    lines.push(`- **Late Filings:** ${flags.late_filing_count} late report(s)`);
-  }
-
-  // List recent issues
-  if (flags.recent_issues.length > 0) {
+  if (review.signals.length > 0) {
     lines.push('');
-    lines.push('### Recent Issues');
+    lines.push('### Recent filing records');
 
-    for (const issue of flags.recent_issues) {
-      const icon = issue.type === 'rfai' ? '!' : issue.type === 'amendment' ? '*' : '?';
-      lines.push(`${icon} **${formatDate(issue.date)}** - ${issue.description}`);
+    for (const signal of review.signals) {
+      lines.push(`- **${formatDate(signal.date)}** - ${signal.description}`);
+      lines.push(`  - File number: ${signal.file_number}`);
+      if (signal.document_url) {
+        lines.push(`  - Document: ${signal.document_url}`);
+      }
     }
   }
 
-  // Add context
   lines.push('');
   lines.push('---');
-  lines.push('*Note: RFAIs indicate the FEC has requested additional information or clarification.*');
-  lines.push('*Amendments may indicate corrections to previously filed reports.*');
+  lines.push('*These records identify items for review. They do not establish a violation.*');
 
   return lines.join('\n');
 }
@@ -148,7 +145,7 @@ export async function executeGetCommitteeFlags(
       client.getFilings({
         committee_id: params.committee_id,
         cycle: params.cycle,
-        document_type: 'RFAI',
+        form_type: 'RFAI',
         limit: 20,
       }),
     ]);

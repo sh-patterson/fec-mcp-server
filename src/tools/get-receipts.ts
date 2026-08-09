@@ -7,6 +7,7 @@ import type { FECClient } from '../api/client.js';
 import type { EnrichedReceipt, PACClassification } from '../api/types.js';
 import { getReceiptsInputSchema } from '../schemas/receipts.schema.js';
 import { formatErrorForToolResponse } from '../utils/errors.js';
+import { formatCycleFilter, resolveTransactionPeriod } from '../utils/filters.js';
 import {
   transformScheduleA,
   classifyPAC,
@@ -34,7 +35,7 @@ export async function executeGetReceipts(
     min_amount?: number;
     two_year_transaction_period?: number;
     cycle?: number;
-    contributor_type?: 'individual' | 'committee';
+    contributor_type?: 'individual' | 'non_individual' | 'committee';
     include_notable?: boolean;
     fuzzy_threshold?: number;
     limit?: number;
@@ -42,17 +43,22 @@ export async function executeGetReceipts(
   }
 ): Promise<GetReceiptsResult> {
   try {
-    const transactionPeriod = params.two_year_transaction_period ?? params.cycle;
-    const includeNotable = params.include_notable ?? true;
+    const transactionPeriod = resolveTransactionPeriod(
+      params.two_year_transaction_period,
+      params.cycle
+    );
+    const includeNotable = params.include_notable ?? false;
     const fuzzyThreshold = params.fuzzy_threshold ?? 90;
+    const minimumAmount = params.min_amount ?? 1000;
+    const sortBy = params.sort_by ?? 'amount';
 
     const response = await client.getScheduleA({
       committee_id: params.committee_id,
-      min_amount: params.min_amount ?? 1000,
+      min_amount: minimumAmount,
       two_year_transaction_period: transactionPeriod,
       contributor_type: params.contributor_type,
       limit: params.limit ?? 20,
-      sort_by: params.sort_by ?? 'amount',
+      sort_by: sortBy,
     });
 
     // Get unique PAC committee IDs for enrichment
@@ -115,24 +121,17 @@ export async function executeGetReceipts(
     }
 
     // Add filter info
-    const filters: string[] = [];
-    if (params.min_amount) {
-      filters.push(`minimum $${params.min_amount.toLocaleString()}`);
-    }
-    if (params.contributor_type) {
-      filters.push(`${params.contributor_type}s only`);
-    }
-    if (transactionPeriod) {
-      filters.push(
-        params.two_year_transaction_period
-          ? `${transactionPeriod} cycle`
-          : `${transactionPeriod} cycle (auto-aligned from cycle)`
-      );
-    }
-
-    if (filters.length > 0) {
-      lines.push(`*Filters: ${filters.join(', ')}*`);
-    }
+    const contributorType =
+      params.contributor_type === 'committee'
+        ? 'non_individual (legacy alias "committee")'
+        : (params.contributor_type ?? 'all');
+    const filters = [
+      `minimum $${minimumAmount.toLocaleString()}`,
+      formatCycleFilter(transactionPeriod),
+      `type ${contributorType}`,
+      `sort ${sortBy}`,
+    ];
+    lines.push(`*Filters: ${filters.join('; ')}*`);
 
     lines.push(`*Showing ${enrichedReceipts.length} of ${response.pagination.count} results*`);
 
@@ -160,6 +159,9 @@ export async function executeGetReceipts(
         referenceData,
         fuzzyThreshold
       );
+      lines.push('### Third-party analyst enrichment');
+      lines.push('*Opt-in matches from the packaged analyst reference data. Review the provenance manifest before use.*');
+      lines.push('');
       lines.push(formatNotableReceiptsText(notableItems, Math.min(params.limit ?? 20, 10)));
       lines.push('');
     }

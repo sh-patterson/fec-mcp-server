@@ -17,7 +17,6 @@ export const getCommitteeFinancesInputSchema = {
     .number()
     .int()
     .min(1980, 'Cycle must be 1980 or later')
-    .max(2030, 'Cycle must be 2030 or earlier')
     .optional()
     .describe('Two-year election cycle (e.g., 2024). Defaults to most recent.'),
 };

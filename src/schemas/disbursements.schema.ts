@@ -23,7 +23,6 @@ export const getDisbursementsInputSchema = {
     .number()
     .int()
     .min(1980)
-    .max(2030)
     .optional()
     .describe('Two-year period (e.g., 2024 covers 2023-2024).'),
 
@@ -31,7 +30,6 @@ export const getDisbursementsInputSchema = {
     .number()
     .int()
     .min(1980)
-    .max(2030)
     .optional()
     .describe('Alias for two_year_transaction_period to align with finance cycle filters.'),
 
@@ -43,8 +41,8 @@ export const getDisbursementsInputSchema = {
   include_notable: z
     .boolean()
     .optional()
-    .default(true)
-    .describe('Include flagged-first notable analysis block in output (default: true)'),
+    .default(false)
+    .describe('Include third-party analyst enrichment (default: false)'),
 
   fuzzy_threshold: z
     .number()
@@ -71,9 +69,20 @@ export const getDisbursementsInputSchema = {
     .describe('Sort results by "amount" (descending) or "date" (most recent first)'),
 };
 
-export const getDisbursementsParamsSchema = z.object(
-  getDisbursementsInputSchema
-);
+export const getDisbursementsParamsSchema = z
+  .object(getDisbursementsInputSchema)
+  .superRefine((value, ctx) => {
+    if (
+      value.cycle !== undefined &&
+      value.two_year_transaction_period !== undefined &&
+      value.cycle !== value.two_year_transaction_period
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Conflicting cycle aliases: cycle and two_year_transaction_period must match.',
+      });
+    }
+  });
 
 export type GetDisbursementsInput = z.infer<
   typeof getDisbursementsParamsSchema

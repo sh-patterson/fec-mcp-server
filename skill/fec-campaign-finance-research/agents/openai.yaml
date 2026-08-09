@@ -1,0 +1,4 @@
+interface:
+  display_name: "FEC Campaign Finance Research"
+  short_description: "Research federal campaign finance records"
+  default_prompt: "Use $fec-campaign-finance-research to research a federal campaign finance question."

@@ -31,7 +31,6 @@ export const searchDonorsInputSchema = {
     .number()
     .int()
     .min(2000)
-    .max(2030)
     .optional()
     .describe('Two-year election cycle (e.g., 2024)'),
   limit: z

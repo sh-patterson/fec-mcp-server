@@ -50,8 +50,7 @@ describe('search_donors tool', () => {
         contributor_state: 'CA',
         two_year_transaction_period: 2024,
         limit: 5,
-      }),
-      60000
+      })
     );
   });
 

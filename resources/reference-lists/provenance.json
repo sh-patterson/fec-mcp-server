@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "source": {
+    "repository": "https://github.com/DGA-Research/FEC_Coder_Project_Streamlit",
+    "path": "Databases/*.csv",
+    "import_commit": "f4176c1898a66b3f16fafa166c80ea2dad694280",
+    "imported_at": "2026-03-04T21:35:07-05:00",
+    "method_notes": "Four CSV snapshots were imported as bundled reference lists. Local filenames identify the loaded records. The import recorded only the source directory pattern, not a per-file upstream path. The package uses these files only for optional third-party analyst enrichment. Official OpenFEC results remain the source for transaction data.",
+    "license_status": "No recorded license. Review source rights before redistribution or refresh."
+  },
+  "files": [
+    {
+      "path": "bad-group-master.csv",
+      "sha256": "e59a8fd2d996c5ff17d01d81a59c2730d04a5e697da8628d7581a8e24d5f01ef"
+    },
+    {
+      "path": "committee-master.csv",
+      "sha256": "972c6601200bbacd02e722913e2f5dfc91eaa4b24e5d8310905bc023ceed2d16"
+    },
+    {
+      "path": "industry-master.csv",
+      "sha256": "6fc357dd8f3a9a1f7576ea272b0648dcbee9c1a962648fffa10f5a1295c39cae"
+    },
+    {
+      "path": "lpac-master.csv",
+      "sha256": "fd922bcef4df09209e19d35a097c52a1657630af23736a872245ea21b9d0cef9"
+    }
+  ]
+}

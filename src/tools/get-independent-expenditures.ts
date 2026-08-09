@@ -6,6 +6,7 @@
 import type { FECClient } from '../api/client.js';
 import { getIndependentExpendituresInputSchema } from '../schemas/independent-expenditures.schema.js';
 import { formatErrorForToolResponse } from '../utils/errors.js';
+import { formatCycleFilter } from '../utils/filters.js';
 import { formatIndependentExpenditureText } from '../utils/formatters.js';
 
 export const GET_INDEPENDENT_EXPENDITURES_TOOL = {
@@ -66,20 +67,13 @@ export async function executeGetIndependentExpenditures(
     }
 
     // Add filter info
-    const filters: string[] = [];
-    if (params.support_oppose) {
-      filters.push(`${params.support_oppose} only`);
-    }
-    if (params.min_amount) {
-      filters.push(`minimum $${params.min_amount.toLocaleString()}`);
-    }
-    if (params.cycle) {
-      filters.push(`${params.cycle} cycle`);
-    }
-
-    if (filters.length > 0) {
-      lines.push(`*Filters: ${filters.join(', ')}*`);
-    }
+    const filters = [
+      `minimum ${params.min_amount === undefined ? 'none' : `$${params.min_amount.toLocaleString()}`}`,
+      formatCycleFilter(params.cycle),
+      `type ${params.support_oppose ?? 'all'}`,
+      'sort amount',
+    ];
+    lines.push(`*Filters: ${filters.join('; ')}*`);
 
     lines.push(`*Showing ${response.results.length} of ${response.pagination.count} results*`);
     lines.push('');

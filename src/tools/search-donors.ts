@@ -7,6 +7,7 @@ import type { FECClient } from '../api/client.js';
 import { searchDonorsInputSchema } from '../schemas/search-donors.schema.js';
 import { formatErrorForToolResponse } from '../utils/errors.js';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
+import { formatCycleFilter } from '../utils/filters.js';
 
 export const SEARCH_DONORS_TOOL = {
   name: 'search_donors',
@@ -32,15 +33,16 @@ export async function executeSearchDonors(
   }
 ): Promise<SearchDonorsResult> {
   try {
+    const minimumAmount = params.min_amount ?? 200;
     const response = await client.searchDonors({
       contributor_name: params.contributor_name,
       contributor_employer: params.contributor_employer,
       contributor_occupation: params.contributor_occupation,
       contributor_state: params.contributor_state,
-      min_amount: params.min_amount ?? 200, // Default to itemized threshold
+      min_amount: minimumAmount,
       two_year_transaction_period: params.cycle,
       limit: params.limit ?? 20,
-    }, 60_000);
+    });
 
     // Build header
     const lines: string[] = ['## Donor Search Results'];
@@ -51,8 +53,10 @@ export async function executeSearchDonors(
     if (params.contributor_employer) criteria.push(`employer: "${params.contributor_employer}"`);
     if (params.contributor_occupation) criteria.push(`occupation: "${params.contributor_occupation}"`);
     if (params.contributor_state) criteria.push(`state: ${params.contributor_state}`);
-    if (params.min_amount) criteria.push(`minimum: ${formatCurrency(params.min_amount)}`);
-    if (params.cycle) criteria.push(`cycle: ${params.cycle}`);
+    criteria.push(`minimum: ${formatCurrency(minimumAmount)}`);
+    criteria.push(formatCycleFilter(params.cycle).replace('cycle ', 'cycle: '));
+    criteria.push('type: individual');
+    criteria.push('sort: amount');
 
     lines.push(`*Search: ${criteria.join(', ')}*`);
     lines.push(`*Found ${response.pagination.count} contributions, showing ${response.results.length}*`);
