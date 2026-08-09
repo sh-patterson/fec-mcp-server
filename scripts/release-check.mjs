@@ -73,7 +73,7 @@ async function checkSkill(repoRoot) {
     readFile(resolve(skillRoot, 'SKILL.md'), 'utf8'),
     readFile(resolve(skillRoot, 'agents', 'openai.yaml'), 'utf8'),
   ]);
-  assert(/^---\nname: fec-campaign-finance-research\n/m.test(skill), 'The FEC skill must declare its canonical name in YAML front matter.');
+  assert(/^---\r?\nname: fec-campaign-finance-research\r?\n/m.test(skill), 'The FEC skill must declare its canonical name in YAML front matter.');
   assert(/^#\s+\S/m.test(skill), 'The FEC skill must contain a top-level heading.');
   assert(/display_name:\s+"FEC Campaign Finance Research"/m.test(metadata), 'The FEC skill metadata must declare its display name.');
   assert(/default_prompt:\s+"Use \$fec-campaign-finance-research/m.test(metadata), 'The FEC skill metadata must declare its default prompt.');
