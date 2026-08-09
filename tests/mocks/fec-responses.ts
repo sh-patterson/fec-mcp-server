@@ -128,10 +128,7 @@ export const mockScheduleAResponse: FECApiResponse<FECScheduleA> = {
     count: 3,
     per_page: 20,
     pages: 1,
-    last_indexes: {
-      last_index: '123456789',
-      last_contribution_receipt_date: '2024-09-15',
-    },
+    last_indexes: null,
   },
   results: [
     {
@@ -231,10 +228,7 @@ export const mockScheduleBResponse: FECApiResponse<FECScheduleB> = {
     count: 3,
     per_page: 20,
     pages: 1,
-    last_indexes: {
-      last_index: '987654321',
-      last_disbursement_date: '2024-09-20',
-    },
+    last_indexes: null,
   },
   results: [
     {

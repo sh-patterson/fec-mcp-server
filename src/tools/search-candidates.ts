@@ -6,6 +6,12 @@
 import type { FECClient } from '../api/client.js';
 import { searchCandidatesInputSchema } from '../schemas/candidate.schema.js';
 import { formatErrorForToolResponse } from '../utils/errors.js';
+import {
+  createPagePaginationState,
+  decodeContinuationToken,
+  encodeContinuationToken,
+  formatPaginationFooter,
+} from '../pagination/continuation.js';
 
 export const SEARCH_CANDIDATES_TOOL = {
   name: 'search_candidates',
@@ -26,17 +32,55 @@ export async function executeSearchCandidates(
     office?: 'H' | 'S' | 'P';
     state?: string;
     party?: string;
+    continuation?: string;
   }
 ): Promise<SearchCandidatesResult> {
   try {
-    const response = await client.searchCandidates(params);
+    const effectiveFilters = {
+      q: params.q,
+      election_year: params.election_year,
+      office: params.office,
+      state: params.state,
+      party: params.party,
+      limit: 20,
+      sort: 'name',
+    };
+    const cursor = params.continuation
+      ? decodeContinuationToken({
+          token: params.continuation,
+          tool: 'search_candidates',
+          effectiveFilters,
+          cursorKind: 'page',
+        })
+      : null;
+    const response = await client.searchCandidates({
+      q: params.q,
+      election_year: params.election_year,
+      office: params.office,
+      state: params.state,
+      party: params.party,
+      page: cursor?.page ?? 1,
+      limit: 20,
+    });
+    const pagination = createPagePaginationState(response.pagination);
+    const nextContinuation = pagination.nextPage === null
+      ? undefined
+      : encodeContinuationToken({
+          tool: 'search_candidates',
+          effectiveFilters,
+          cursor: { kind: 'page', page: pagination.nextPage },
+        });
 
     if (response.results.length === 0) {
       return {
         content: [
           {
             type: 'text',
-            text: `No candidates found matching "${params.q}". Try a different spelling or broader search term.`,
+            text: [
+              `No candidates found matching "${params.q}". Try a different spelling or broader search term.`,
+              '',
+              formatPaginationFooter(0, pagination, nextContinuation),
+            ].join('\n'),
           },
         ],
       };
@@ -45,7 +89,6 @@ export async function executeSearchCandidates(
     // Format results
     const lines: string[] = [
       `## Candidate Search Results for "${params.q}"`,
-      `Found ${response.pagination.count} candidate(s).`,
       '',
     ];
 
@@ -80,10 +123,7 @@ export async function executeSearchCandidates(
       lines.push('');
     });
 
-    // Add pagination info if there are more results
-    if (response.pagination.pages > 1) {
-      lines.push(`*Showing page 1 of ${response.pagination.pages}. Total results: ${response.pagination.count}*`);
-    }
+    lines.push(formatPaginationFooter(response.results.length, pagination, nextContinuation));
 
     return {
       content: [{ type: 'text', text: lines.join('\n') }],

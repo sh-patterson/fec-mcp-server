@@ -8,6 +8,24 @@ import { searchSpendingInputSchema } from '../schemas/search-spending.schema.js'
 import { formatErrorForToolResponse } from '../utils/errors.js';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
 import { formatCycleFilter } from '../utils/filters.js';
+import {
+  createKeysetPaginationState,
+  decodeContinuationToken,
+  encodeContinuationToken,
+  formatPaginationFooter,
+  validateOpenFecKeysetValues,
+} from '../pagination/continuation.js';
+
+const SPENDING_CURSOR_KEYS = [
+  'last_index',
+  'last_disbursement_amount',
+  'last_disbursement_date',
+  'sort_null_only',
+] as const;
+const REQUIRED_SPENDING_CURSOR_KEYS = [
+  'last_index',
+  'last_disbursement_amount',
+] as const;
 
 export const SEARCH_SPENDING_TOOL = {
   name: 'search_spending',
@@ -29,18 +47,56 @@ export async function executeSearchSpending(
     min_amount?: number;
     cycle?: number;
     limit?: number;
+    continuation?: string;
   }
 ): Promise<SearchSpendingResult> {
   try {
     const minimumAmount = params.min_amount ?? 500;
+    const limit = params.limit ?? 20;
+    const effectiveFilters = {
+      description: params.description,
+      recipient_name: params.recipient_name,
+      recipient_state: params.recipient_state,
+      min_amount: minimumAmount,
+      cycle: params.cycle,
+      limit,
+      type: 'all',
+      sort: 'amount',
+    };
+    const continuationCursor = params.continuation
+      ? decodeContinuationToken({
+          token: params.continuation,
+          tool: 'search_spending',
+          effectiveFilters,
+          cursorKind: 'keyset',
+          allowedKeysetKeys: SPENDING_CURSOR_KEYS,
+          requiredKeysetKeys: REQUIRED_SPENDING_CURSOR_KEYS,
+        })
+      : null;
     const response = await client.searchSpending({
       description: params.description,
       recipient_name: params.recipient_name,
       recipient_state: params.recipient_state,
       min_amount: minimumAmount,
       two_year_transaction_period: params.cycle,
-      limit: params.limit ?? 20,
+      limit,
+      cursor: continuationCursor?.values,
     });
+    const pagination = createKeysetPaginationState(response.pagination);
+    const nextCursor = pagination.nextValues === null
+      ? null
+      : validateOpenFecKeysetValues(
+          pagination.nextValues,
+          SPENDING_CURSOR_KEYS,
+          REQUIRED_SPENDING_CURSOR_KEYS
+        );
+    const nextContinuation = nextCursor === null
+      ? undefined
+      : encodeContinuationToken({
+          tool: 'search_spending',
+          effectiveFilters,
+          cursor: { kind: 'keyset', values: nextCursor },
+        });
 
     // Build header
     const lines: string[] = ['## Spending Search Results'];
@@ -56,11 +112,12 @@ export async function executeSearchSpending(
     criteria.push('sort: amount');
 
     lines.push(`*Search: ${criteria.join(', ')}*`);
-    lines.push(`*Found ${response.pagination.count} disbursements, showing ${response.results.length}*`);
     lines.push('');
 
     if (response.results.length === 0) {
       lines.push('No disbursements found matching the criteria.');
+      lines.push('');
+      lines.push(formatPaginationFooter(0, pagination, nextContinuation));
       return {
         content: [{ type: 'text', text: lines.join('\n') }],
       };
@@ -101,10 +158,16 @@ export async function executeSearchSpending(
         if (location) {
           lines.push(`   - Location: ${location}`);
         }
+        lines.push(`   - Source IDs: sub_id ${disb.sub_id}; transaction_id ${disb.transaction_id}; file_number ${disb.file_number}`);
+        if (disb.pdf_url) {
+          lines.push(`   - Source document: ${disb.pdf_url}`);
+        }
         lines.push('');
         index++;
       }
     }
+
+    lines.push(formatPaginationFooter(response.results.length, pagination, nextContinuation));
 
     return {
       content: [{ type: 'text', text: lines.join('\n') }],

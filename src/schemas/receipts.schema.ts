@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod';
+import { continuationSchema } from './continuation.schema.js';
 
 const committeeIdPattern = /^C\d{8}$/;
 
@@ -67,6 +68,8 @@ export const getReceiptsInputSchema = {
     .optional()
     .default('amount')
     .describe('Sort results by "amount" (descending) or "date" (most recent first)'),
+
+  continuation: continuationSchema,
 };
 
 export const getReceiptsParamsSchema = z

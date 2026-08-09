@@ -48,6 +48,14 @@ Each transaction or search query returns one OpenFEC page. The displayed "showin
 
 OpenFEC limits each API call to 100 results per page. The tools that accept `limit` accept values from 1 through 100. Their default is 20. Large OpenFEC result counts can be approximate. Narrow the query before you draw a conclusion.
 
+### Continue a result set
+
+These tools support continuation: `search_candidates`, `get_receipts`, `get_disbursements`, `get_independent_expenditures`, `search_donors`, and `search_spending`. When OpenFEC supplies continuation state, the result includes a paste-ready value such as `{"continuation":"fecp1..."}`. Pass the token as the tool's `continuation` field in the next call.
+
+Continuation tokens are unsigned, stateless, opaque cursors. The server binds each token to the effective filters and the tool that created it. If you change a filter or use the token with another tool, the server rejects the request before it calls OpenFEC. Candidate continuation uses OpenFEC page numbers. Transaction continuation uses OpenFEC keyset cursor values. A final nonempty keyset page can include another token. Continue until the footer says `Continuation: none`; the terminal response can contain no records. Candidate page contents are not guaranteed to remain stable across OpenFEC refreshes.
+
+The footer reports the OpenFEC count status as exact, approximate, or unspecified. Exact counts are marked `exact (N records)`. Approximate counts are marked `approximate (N reported records)`. Missing or unclassified counts are marked `unspecified` (or `unspecified (N reported records)` when OpenFEC supplies a value). The response preserves source record IDs and URLs returned by OpenFEC. Treat those IDs and URLs as upstream evidence, not as values created by this package.
+
 `get_committee_finances` uses `/committee/{id}/totals/` for cycle receipts, disbursements, contribution categories, and loan values. It uses the latest final report for cash and debt balances. Every amount is labeled by its period model. `get_committee_flags` reports filing records. An RFAI or amendment is a review lead, not proof of a violation.
 
 ## Docker

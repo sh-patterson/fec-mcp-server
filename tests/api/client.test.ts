@@ -234,6 +234,19 @@ describe('FECClient', () => {
       expect(result.results[0].principal_committees).toBeDefined();
       expect(result.results[0].principal_committees[0].committee_id).toBe('C00523969');
     });
+
+    it('should pass a continuation page', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse(mockCandidateSearchResponse)
+      );
+
+      await client.searchCandidates({ q: 'Smith', page: 2, limit: 20 });
+
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
+      expect(calledUrl).toContain('page=2');
+      expect(calledUrl).toContain('sort=name');
+      expect(calledUrl).toContain('per_page=20');
+    });
   });
 
   describe('getCommitteeReports', () => {
@@ -344,6 +357,21 @@ describe('FECClient', () => {
       const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('is_individual=false');
     });
+
+    it('should pass Schedule A keyset values', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse(mockScheduleAResponse)
+      );
+
+      await client.getScheduleA({
+        committee_id: 'C00523969',
+        cursor: { last_index: 10, last_contribution_receipt_amount: 5000 },
+      });
+
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
+      expect(calledUrl).toContain('last_index=10');
+      expect(calledUrl).toContain('last_contribution_receipt_amount=5000');
+    });
   });
 
   describe('getScheduleB', () => {
@@ -390,6 +418,21 @@ describe('FECClient', () => {
       const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('disbursement_description=MEDIA');
     });
+
+    it('should pass Schedule B keyset values', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse(mockScheduleBResponse)
+      );
+
+      await client.getScheduleB({
+        committee_id: 'C00523969',
+        cursor: { last_index: 10, last_disbursement_amount: 5000 },
+      });
+
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
+      expect(calledUrl).toContain('last_index=10');
+      expect(calledUrl).toContain('last_disbursement_amount=5000');
+    });
   });
 
   describe('getScheduleE', () => {
@@ -408,6 +451,43 @@ describe('FECClient', () => {
       expect(calledUrl).toContain('candidate_id=H8CA15053');
       expect(calledUrl).toContain('support_oppose_indicator=S');
       expect(calledUrl).toContain('two_year_transaction_period=2024');
+    });
+
+    it('should pass Schedule E keyset values', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse({ api_version: '1.0', pagination: { count: 0, page: 1, pages: 0, per_page: 20 }, results: [] })
+      );
+
+      await client.getScheduleE({
+        candidate_id: 'H8CA15053',
+        cursor: { last_index: 10, last_expenditure_amount: 5000 },
+      });
+
+      const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
+      expect(calledUrl).toContain('last_index=10');
+      expect(calledUrl).toContain('last_expenditure_amount=5000');
+    });
+  });
+
+  describe('search route keysets', () => {
+    it('should pass donor and spending cursor values', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+        createMockResponse({ api_version: '1.0', pagination: { count: 0, page: 1, pages: 0, per_page: 20 }, results: [] })
+      );
+
+      await client.searchDonors({
+        contributor_name: 'Smith',
+        cursor: { last_index: 10, last_contribution_receipt_amount: 5000 },
+      });
+      await client.searchSpending({
+        recipient_name: 'Vendor',
+        cursor: { last_index: 20, last_disbursement_amount: 4000 },
+      });
+
+      const donorUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
+      const spendingUrl = getCalledUrl(fetchSpy.mock.calls[1][0]);
+      expect(donorUrl).toContain('last_contribution_receipt_amount=5000');
+      expect(spendingUrl).toContain('last_disbursement_amount=4000');
     });
   });
 

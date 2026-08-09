@@ -8,6 +8,23 @@ import { getIndependentExpendituresInputSchema } from '../schemas/independent-ex
 import { formatErrorForToolResponse } from '../utils/errors.js';
 import { formatCycleFilter } from '../utils/filters.js';
 import { formatIndependentExpenditureText } from '../utils/formatters.js';
+import {
+  createKeysetPaginationState,
+  decodeContinuationToken,
+  encodeContinuationToken,
+  formatPaginationFooter,
+  validateOpenFecKeysetValues,
+} from '../pagination/continuation.js';
+
+const EXPENDITURE_CURSOR_KEYS = [
+  'last_index',
+  'last_expenditure_amount',
+  'sort_null_only',
+] as const;
+const REQUIRED_EXPENDITURE_CURSOR_KEYS = [
+  'last_index',
+  'last_expenditure_amount',
+] as const;
 
 export const GET_INDEPENDENT_EXPENDITURES_TOOL = {
   name: 'get_independent_expenditures',
@@ -29,6 +46,7 @@ export async function executeGetIndependentExpenditures(
     min_amount?: number;
     cycle?: number;
     limit?: number;
+    continuation?: string;
   }
 ): Promise<GetIndependentExpendituresResult> {
   try {
@@ -39,15 +57,50 @@ export async function executeGetIndependentExpenditures(
     } else if (params.support_oppose === 'oppose') {
       supportOpposeIndicator = 'O';
     }
-
+    const limit = params.limit ?? 20;
+    const effectiveFilters = {
+      candidate_id: params.candidate_id,
+      committee_id: params.committee_id,
+      support_oppose: params.support_oppose,
+      min_amount: params.min_amount,
+      cycle: params.cycle,
+      limit,
+      sort: 'amount',
+    };
+    const continuationCursor = params.continuation
+      ? decodeContinuationToken({
+          token: params.continuation,
+          tool: 'get_independent_expenditures',
+          effectiveFilters,
+          cursorKind: 'keyset',
+          allowedKeysetKeys: EXPENDITURE_CURSOR_KEYS,
+          requiredKeysetKeys: REQUIRED_EXPENDITURE_CURSOR_KEYS,
+        })
+      : null;
     const response = await client.getScheduleE({
       candidate_id: params.candidate_id,
       committee_id: params.committee_id,
       support_oppose_indicator: supportOpposeIndicator,
       min_amount: params.min_amount,
       two_year_transaction_period: params.cycle,
-      limit: params.limit ?? 20,
+      limit,
+      cursor: continuationCursor?.values,
     });
+    const pagination = createKeysetPaginationState(response.pagination);
+    const nextCursor = pagination.nextValues === null
+      ? null
+      : validateOpenFecKeysetValues(
+          pagination.nextValues,
+          EXPENDITURE_CURSOR_KEYS,
+          REQUIRED_EXPENDITURE_CURSOR_KEYS
+        );
+    const nextContinuation = nextCursor === null
+      ? undefined
+      : encodeContinuationToken({
+          tool: 'get_independent_expenditures',
+          effectiveFilters,
+          cursor: { kind: 'keyset', values: nextCursor },
+        });
 
     // Build header based on search type
     let targetCandidate: string | undefined;
@@ -75,12 +128,13 @@ export async function executeGetIndependentExpenditures(
     ];
     lines.push(`*Filters: ${filters.join('; ')}*`);
 
-    lines.push(`*Showing ${response.results.length} of ${response.pagination.count} results*`);
     lines.push('');
 
     // Format the expenditures
     const expendituresText = formatIndependentExpenditureText(response.results, targetCandidate);
     lines.push(expendituresText);
+    lines.push('');
+    lines.push(formatPaginationFooter(response.results.length, pagination, nextContinuation));
 
     return {
       content: [{ type: 'text', text: lines.join('\n') }],

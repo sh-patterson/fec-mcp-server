@@ -16,6 +16,20 @@ import {
 import { loadReferenceData } from '../notable/reference-data.js';
 import { classifyNotableReceipts } from '../notable/classifier.js';
 import { formatNotableReceiptsText } from '../notable/formatters.js';
+import {
+  createKeysetPaginationState,
+  decodeContinuationToken,
+  encodeContinuationToken,
+  formatPaginationFooter,
+  validateOpenFecKeysetValues,
+} from '../pagination/continuation.js';
+
+const RECEIPT_CURSOR_KEYS = [
+  'last_index',
+  'last_contribution_receipt_amount',
+  'last_contribution_receipt_date',
+  'sort_null_only',
+] as const;
 
 export const GET_RECEIPTS_TOOL = {
   name: 'get_receipts',
@@ -40,6 +54,7 @@ export async function executeGetReceipts(
     fuzzy_threshold?: number;
     limit?: number;
     sort_by?: 'amount' | 'date';
+    continuation?: string;
   }
 ): Promise<GetReceiptsResult> {
   try {
@@ -51,15 +66,60 @@ export async function executeGetReceipts(
     const fuzzyThreshold = params.fuzzy_threshold ?? 90;
     const minimumAmount = params.min_amount ?? 1000;
     const sortBy = params.sort_by ?? 'amount';
-
+    const limit = params.limit ?? 20;
+    const contributorType = params.contributor_type === 'committee'
+      ? 'non_individual'
+      : (params.contributor_type ?? 'all');
+    const effectiveFilters = {
+      committee_id: params.committee_id,
+      min_amount: minimumAmount,
+      two_year_transaction_period: transactionPeriod,
+      contributor_type: contributorType,
+      include_notable: includeNotable,
+      fuzzy_threshold: fuzzyThreshold,
+      limit,
+      sort: sortBy,
+    };
+    const requiredCursorKeys = [
+      'last_index',
+      sortBy === 'date'
+        ? 'last_contribution_receipt_date'
+        : 'last_contribution_receipt_amount',
+    ] as const;
+    const continuationCursor = params.continuation
+      ? decodeContinuationToken({
+          token: params.continuation,
+          tool: 'get_receipts',
+          effectiveFilters,
+          cursorKind: 'keyset',
+          allowedKeysetKeys: RECEIPT_CURSOR_KEYS,
+          requiredKeysetKeys: requiredCursorKeys,
+        })
+      : null;
     const response = await client.getScheduleA({
       committee_id: params.committee_id,
       min_amount: minimumAmount,
       two_year_transaction_period: transactionPeriod,
       contributor_type: params.contributor_type,
-      limit: params.limit ?? 20,
+      limit,
       sort_by: sortBy,
+      cursor: continuationCursor?.values,
     });
+    const pagination = createKeysetPaginationState(response.pagination);
+    const nextCursor = pagination.nextValues === null
+      ? null
+      : validateOpenFecKeysetValues(
+          pagination.nextValues,
+          RECEIPT_CURSOR_KEYS,
+          requiredCursorKeys
+        );
+    const nextContinuation = nextCursor === null
+      ? undefined
+      : encodeContinuationToken({
+          tool: 'get_receipts',
+          effectiveFilters,
+          cursor: { kind: 'keyset', values: nextCursor },
+        });
 
     // Get unique PAC committee IDs for enrichment
     const pacCommitteeIds = [
@@ -121,19 +181,16 @@ export async function executeGetReceipts(
     }
 
     // Add filter info
-    const contributorType =
-      params.contributor_type === 'committee'
-        ? 'non_individual (legacy alias "committee")'
-        : (params.contributor_type ?? 'all');
+    const contributorTypeLabel = params.contributor_type === 'committee'
+      ? 'non_individual (legacy alias "committee")'
+      : contributorType;
     const filters = [
       `minimum $${minimumAmount.toLocaleString()}`,
       formatCycleFilter(transactionPeriod),
-      `type ${contributorType}`,
+      `type ${contributorTypeLabel}`,
       `sort ${sortBy}`,
     ];
     lines.push(`*Filters: ${filters.join('; ')}*`);
-
-    lines.push(`*Showing ${enrichedReceipts.length} of ${response.pagination.count} results*`);
 
     const committeeOrOrgReceipts = enrichedReceipts.filter(
       (receipt) => receipt.contributor_type !== 'Individual'
@@ -169,6 +226,8 @@ export async function executeGetReceipts(
     // Format enriched receipts
     const receiptsText = formatEnrichedReceiptsText(enrichedReceipts, undefined);
     lines.push(receiptsText);
+    lines.push('');
+    lines.push(formatPaginationFooter(enrichedReceipts.length, pagination, nextContinuation));
 
     return {
       content: [{ type: 'text', text: lines.join('\n') }],
