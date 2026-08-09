@@ -11,6 +11,7 @@ import type {
   FECCommittee,
   FECCommitteeReport,
   FECCommitteeTotals,
+  FECKeysetIndexes,
   FECScheduleA,
   FECScheduleB,
   FECScheduleC,
@@ -31,7 +32,25 @@ export interface SearchCandidatesParams {
   office?: 'H' | 'S' | 'P';
   state?: string;
   party?: string;
+  page?: number;
+  limit?: number;
 }
+
+export type ScheduleACursor = Pick<FECKeysetIndexes, 'last_index'> &
+  Partial<
+    Pick<
+      FECKeysetIndexes,
+      'last_contribution_receipt_amount' | 'last_contribution_receipt_date' | 'sort_null_only'
+    >
+  >;
+
+export type ScheduleBCursor = Pick<FECKeysetIndexes, 'last_index'> &
+  Partial<
+    Pick<FECKeysetIndexes, 'last_disbursement_amount' | 'last_disbursement_date' | 'sort_null_only'>
+  >;
+
+export type ScheduleECursor = Pick<FECKeysetIndexes, 'last_index'> &
+  Partial<Pick<FECKeysetIndexes, 'last_expenditure_amount' | 'sort_null_only'>>;
 
 export interface GetCommitteeReportsParams {
   cycle?: number;
@@ -48,6 +67,7 @@ export interface GetScheduleAParams {
   contributor_type?: 'individual' | 'non_individual' | 'committee';
   limit?: number;
   sort_by?: 'amount' | 'date';
+  cursor?: ScheduleACursor;
 }
 
 export interface GetScheduleBParams {
@@ -57,6 +77,7 @@ export interface GetScheduleBParams {
   purpose?: string;
   limit?: number;
   sort_by?: 'amount' | 'date';
+  cursor?: ScheduleBCursor;
 }
 
 export interface GetScheduleCParams {
@@ -78,6 +99,7 @@ export interface GetScheduleEParams {
   min_amount?: number;
   two_year_transaction_period?: number;
   limit?: number;
+  cursor?: ScheduleECursor;
 }
 
 export interface SearchDonorsParams {
@@ -88,6 +110,7 @@ export interface SearchDonorsParams {
   min_amount?: number;
   two_year_transaction_period?: number;
   limit?: number;
+  cursor?: ScheduleACursor;
 }
 
 export interface SearchSpendingParams {
@@ -97,6 +120,7 @@ export interface SearchSpendingParams {
   min_amount?: number;
   two_year_transaction_period?: number;
   limit?: number;
+  cursor?: ScheduleBCursor;
 }
 
 export interface GetFilingsParams {
@@ -237,7 +261,9 @@ export class FECClient {
       office: params.office,
       state: params.state,
       party: params.party,
-      per_page: DEFAULT_PER_PAGE,
+      page: params.page,
+      sort: 'name',
+      per_page: params.limit || DEFAULT_PER_PAGE,
     }, timeout);
   }
 
@@ -282,6 +308,7 @@ export class FECClient {
       two_year_transaction_period: params.two_year_transaction_period,
       sort: sortField,
       per_page: params.limit || DEFAULT_PER_PAGE,
+      ...params.cursor,
     };
 
     // Filter by contributor type
@@ -311,6 +338,7 @@ export class FECClient {
       disbursement_description: params.purpose,
       sort: sortField,
       per_page: params.limit || DEFAULT_PER_PAGE,
+      ...params.cursor,
     });
   }
 
@@ -350,6 +378,7 @@ export class FECClient {
       two_year_transaction_period: params.two_year_transaction_period,
       sort: '-expenditure_amount',
       per_page: params.limit || DEFAULT_PER_PAGE,
+      ...params.cursor,
     });
   }
 
@@ -389,6 +418,7 @@ export class FECClient {
       is_individual: true, // Only search individual donors
       sort: '-contribution_receipt_amount',
       per_page: params.limit || DEFAULT_PER_PAGE,
+      ...params.cursor,
     }, timeout);
   }
 
@@ -404,6 +434,7 @@ export class FECClient {
       two_year_transaction_period: params.two_year_transaction_period,
       sort: '-disbursement_amount',
       per_page: params.limit || DEFAULT_PER_PAGE,
+      ...params.cursor,
     }, timeout);
   }
 }

@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod';
+import { continuationSchema } from './continuation.schema.js';
 
 export const searchCandidatesInputSchema = {
   q: z
@@ -33,6 +34,8 @@ export const searchCandidatesInputSchema = {
     .string()
     .optional()
     .describe('Filter by party code (e.g., "DEM", "REP", "LIB")'),
+
+  continuation: continuationSchema,
 };
 
 export const searchCandidatesParamsSchema = z.object(searchCandidatesInputSchema);

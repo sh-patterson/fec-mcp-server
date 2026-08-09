@@ -12,22 +12,33 @@ export interface FECApiResponse<T> {
 
 // Standard pagination (most endpoints)
 export interface FECPagination {
-  count: number;
+  count: number | null;
+  is_count_exact?: boolean;
   page: number;
   pages: number;
   per_page: number;
 }
 
-// Keyset pagination (Schedule A/B endpoints)
+export type FECCursorScalar = string | number | boolean;
+
+export interface FECKeysetIndexes {
+  last_index: string | number;
+  last_contribution_receipt_amount?: number;
+  last_contribution_receipt_date?: string;
+  last_disbursement_amount?: number;
+  last_disbursement_date?: string;
+  last_expenditure_amount?: number;
+  last_expenditure_date?: string;
+  sort_null_only?: boolean;
+}
+
+// Keyset pagination (Schedule A/B/E endpoints)
 export interface FECKeysetPagination {
-  count: number;
+  count: number | null;
+  is_count_exact?: boolean;
   per_page: number;
   pages: number;
-  last_indexes: {
-    last_index: string;
-    last_contribution_receipt_date?: string;
-    last_disbursement_date?: string;
-  } | null;
+  last_indexes: FECKeysetIndexes | null;
 }
 
 // Principal committee associated with a candidate
@@ -147,6 +158,7 @@ export interface FECScheduleA {
   link_id: string;
   transaction_id: string;
   file_number: number;
+  pdf_url?: string | null;
   // Contributor committee (if PAC)
   contributor_committee_id: string | null;
 }
@@ -177,6 +189,7 @@ export interface FECScheduleB {
   link_id: string;
   transaction_id: string;
   file_number: number;
+  pdf_url?: string | null;
   // Recipient committee (if PAC)
   recipient_committee_id: string | null;
 }
@@ -225,6 +238,10 @@ export interface FormattedReceipt {
   occupation: string | null;
   city: string | null;
   state: string | null;
+  sub_id: string;
+  transaction_id: string;
+  file_number: number;
+  pdf_url: string | null;
 }
 
 // Formatted disbursement for tool output
@@ -236,6 +253,10 @@ export interface FormattedDisbursement {
   purpose_category: string | null;
   city: string | null;
   state: string | null;
+  sub_id: string;
+  transaction_id: string;
+  file_number: number;
+  pdf_url: string | null;
 }
 
 // Committee details (for PAC classification)
@@ -324,6 +345,10 @@ export interface FECScheduleE {
   // Filing info
   filing_date: string;
   two_year_transaction_period: number;
+  sub_id?: string;
+  transaction_id?: string;
+  file_number?: number;
+  pdf_url?: string | null;
 }
 
 // Filing record (for RFAIs and amendments)

@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod';
+import { continuationSchema } from './continuation.schema.js';
 
 export const searchDonorsInputSchema = {
   contributor_name: z
@@ -40,6 +41,7 @@ export const searchDonorsInputSchema = {
     .max(100)
     .optional()
     .describe('Maximum number of results to return (default: 20)'),
+  continuation: continuationSchema,
 };
 
 export const searchDonorsParamsSchema = z

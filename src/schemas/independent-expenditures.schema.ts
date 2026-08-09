@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod';
+import { continuationSchema } from './continuation.schema.js';
 
 // Candidate IDs are either House/Senate format like H8CA15053 or presidential format like P00009423.
 const candidateIdPattern = /^(?:[HS]\d[A-Z]{2}\d{5}|P\d{8})$/;
@@ -45,6 +46,7 @@ export const getIndependentExpendituresInputSchema = {
     .max(100)
     .optional()
     .describe('Maximum number of results to return (default: 20)'),
+  continuation: continuationSchema,
 };
 
 export const getIndependentExpendituresParamsSchema = z

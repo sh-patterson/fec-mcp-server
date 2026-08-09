@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod';
+import { continuationSchema } from './continuation.schema.js';
 
 export const searchSpendingInputSchema = {
   description: z
@@ -36,6 +37,7 @@ export const searchSpendingInputSchema = {
     .max(100)
     .optional()
     .describe('Maximum number of results to return (default: 20)'),
+  continuation: continuationSchema,
 };
 
 export const searchSpendingParamsSchema = z

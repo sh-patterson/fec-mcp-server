@@ -4,6 +4,9 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  searchCandidatesParamsSchema,
+  getReceiptsParamsSchema,
+  getDisbursementsParamsSchema,
   getIndependentExpendituresParamsSchema,
   searchDonorsParamsSchema,
   searchSpendingParamsSchema,
@@ -49,5 +52,22 @@ describe('tool input schemas', () => {
 
     expect(parsed.success).toBe(false);
     expect(parsed.error?.issues[0]?.message).toContain('description or recipient_name');
+  });
+
+  it('should accept bounded continuation tokens on all six paginated tools', () => {
+    const continuation = 'fecp1.example';
+    const schemasAndInputs = [
+      [searchCandidatesParamsSchema, { q: 'Smith', continuation }],
+      [getReceiptsParamsSchema, { committee_id: 'C00000001', continuation }],
+      [getDisbursementsParamsSchema, { committee_id: 'C00000001', continuation }],
+      [getIndependentExpendituresParamsSchema, { candidate_id: 'H8CA15053', continuation }],
+      [searchDonorsParamsSchema, { contributor_name: 'Smith', continuation }],
+      [searchSpendingParamsSchema, { recipient_name: 'Vendor', continuation }],
+    ] as const;
+
+    for (const [schema, input] of schemasAndInputs) {
+      expect(schema.safeParse(input).success).toBe(true);
+      expect(schema.safeParse({ ...input, continuation: 'x'.repeat(2049) }).success).toBe(false);
+    }
   });
 });

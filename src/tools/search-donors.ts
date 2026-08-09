@@ -8,6 +8,24 @@ import { searchDonorsInputSchema } from '../schemas/search-donors.schema.js';
 import { formatErrorForToolResponse } from '../utils/errors.js';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
 import { formatCycleFilter } from '../utils/filters.js';
+import {
+  createKeysetPaginationState,
+  decodeContinuationToken,
+  encodeContinuationToken,
+  formatPaginationFooter,
+  validateOpenFecKeysetValues,
+} from '../pagination/continuation.js';
+
+const DONOR_CURSOR_KEYS = [
+  'last_index',
+  'last_contribution_receipt_amount',
+  'last_contribution_receipt_date',
+  'sort_null_only',
+] as const;
+const REQUIRED_DONOR_CURSOR_KEYS = [
+  'last_index',
+  'last_contribution_receipt_amount',
+] as const;
 
 export const SEARCH_DONORS_TOOL = {
   name: 'search_donors',
@@ -30,10 +48,33 @@ export async function executeSearchDonors(
     min_amount?: number;
     cycle?: number;
     limit?: number;
+    continuation?: string;
   }
 ): Promise<SearchDonorsResult> {
   try {
     const minimumAmount = params.min_amount ?? 200;
+    const limit = params.limit ?? 20;
+    const effectiveFilters = {
+      contributor_name: params.contributor_name,
+      contributor_employer: params.contributor_employer,
+      contributor_occupation: params.contributor_occupation,
+      contributor_state: params.contributor_state,
+      min_amount: minimumAmount,
+      cycle: params.cycle,
+      limit,
+      type: 'individual',
+      sort: 'amount',
+    };
+    const continuationCursor = params.continuation
+      ? decodeContinuationToken({
+          token: params.continuation,
+          tool: 'search_donors',
+          effectiveFilters,
+          cursorKind: 'keyset',
+          allowedKeysetKeys: DONOR_CURSOR_KEYS,
+          requiredKeysetKeys: REQUIRED_DONOR_CURSOR_KEYS,
+        })
+      : null;
     const response = await client.searchDonors({
       contributor_name: params.contributor_name,
       contributor_employer: params.contributor_employer,
@@ -41,8 +82,24 @@ export async function executeSearchDonors(
       contributor_state: params.contributor_state,
       min_amount: minimumAmount,
       two_year_transaction_period: params.cycle,
-      limit: params.limit ?? 20,
+      limit,
+      cursor: continuationCursor?.values,
     });
+    const pagination = createKeysetPaginationState(response.pagination);
+    const nextCursor = pagination.nextValues === null
+      ? null
+      : validateOpenFecKeysetValues(
+          pagination.nextValues,
+          DONOR_CURSOR_KEYS,
+          REQUIRED_DONOR_CURSOR_KEYS
+        );
+    const nextContinuation = nextCursor === null
+      ? undefined
+      : encodeContinuationToken({
+          tool: 'search_donors',
+          effectiveFilters,
+          cursor: { kind: 'keyset', values: nextCursor },
+        });
 
     // Build header
     const lines: string[] = ['## Donor Search Results'];
@@ -59,11 +116,12 @@ export async function executeSearchDonors(
     criteria.push('sort: amount');
 
     lines.push(`*Search: ${criteria.join(', ')}*`);
-    lines.push(`*Found ${response.pagination.count} contributions, showing ${response.results.length}*`);
     lines.push('');
 
     if (response.results.length === 0) {
       lines.push('No contributions found matching the criteria.');
+      lines.push('');
+      lines.push(formatPaginationFooter(0, pagination, nextContinuation));
       return {
         content: [{ type: 'text', text: lines.join('\n') }],
       };
@@ -104,10 +162,16 @@ export async function executeSearchDonors(
         if (location) {
           lines.push(`   - Location: ${location}`);
         }
+        lines.push(`   - Source IDs: sub_id ${contrib.sub_id}; transaction_id ${contrib.transaction_id}; file_number ${contrib.file_number}`);
+        if (contrib.pdf_url) {
+          lines.push(`   - Source document: ${contrib.pdf_url}`);
+        }
         lines.push('');
         index++;
       }
     }
+
+    lines.push(formatPaginationFooter(response.results.length, pagination, nextContinuation));
 
     return {
       content: [{ type: 'text', text: lines.join('\n') }],

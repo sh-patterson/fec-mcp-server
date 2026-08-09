@@ -149,6 +149,10 @@ export function transformScheduleA(record: FECScheduleA): FormattedReceipt {
     occupation: record.contributor_occupation,
     city: record.contributor_city,
     state: record.contributor_state,
+    sub_id: record.sub_id,
+    transaction_id: record.transaction_id,
+    file_number: record.file_number,
+    pdf_url: record.pdf_url ?? null,
   };
 }
 
@@ -164,7 +168,33 @@ export function transformScheduleB(record: FECScheduleB): FormattedDisbursement 
     purpose_category: record.disbursement_purpose_category,
     city: record.recipient_city,
     state: record.recipient_state,
+    sub_id: record.sub_id,
+    transaction_id: record.transaction_id,
+    file_number: record.file_number,
+    pdf_url: record.pdf_url ?? null,
   };
+}
+
+function appendSourceMetadata(
+  lines: string[],
+  source: {
+    sub_id?: string;
+    transaction_id?: string;
+    file_number?: number;
+    pdf_url?: string | null;
+  }
+): void {
+  const identifiers = [
+    source.sub_id ? `sub_id ${source.sub_id}` : null,
+    source.transaction_id ? `transaction_id ${source.transaction_id}` : null,
+    source.file_number !== undefined ? `file_number ${source.file_number}` : null,
+  ].filter((value): value is string => value !== null);
+  if (identifiers.length > 0) {
+    lines.push(`   - Source IDs: ${identifiers.join('; ')}`);
+  }
+  if (source.pdf_url) {
+    lines.push(`   - Source document: ${source.pdf_url}`);
+  }
 }
 
 function formatReportedCurrency(amount: number | null): string {
@@ -257,6 +287,7 @@ export function formatReceiptsText(receipts: FormattedReceipt[], committeeName?:
     if (location) {
       lines.push(`   - Location: ${location}`);
     }
+    appendSourceMetadata(lines, receipt);
     lines.push('');
   });
 
@@ -291,6 +322,7 @@ export function formatDisbursementsText(disbursements: FormattedDisbursement[], 
     if (location) {
       lines.push(`   - Location: ${location}`);
     }
+    appendSourceMetadata(lines, disbursement);
     lines.push('');
   });
 
@@ -368,6 +400,7 @@ export function formatIndependentExpenditureText(
     if (exp.payee_name) {
       lines.push(`   - Paid to: ${exp.payee_name}`);
     }
+    appendSourceMetadata(lines, exp);
     lines.push('');
   });
 
@@ -457,6 +490,7 @@ export function formatEnrichedReceiptsText(receipts: EnrichedReceipt[], committe
       if (pac.sponsor_candidate) {
         lines.push(`   - Sponsor: ${pac.sponsor_candidate}`);
       }
+      appendSourceMetadata(lines, receipt);
       lines.push('');
     });
   }
@@ -478,6 +512,7 @@ export function formatEnrichedReceiptsText(receipts: EnrichedReceipt[], committe
       if (location) {
         lines.push(`   - Location: ${location}`);
       }
+      appendSourceMetadata(lines, receipt);
       lines.push('');
     });
   }
@@ -494,6 +529,7 @@ export function formatEnrichedReceiptsText(receipts: EnrichedReceipt[], committe
       if (location) {
         lines.push(`   - Location: ${location}`);
       }
+      appendSourceMetadata(lines, receipt);
       lines.push('');
     });
   }

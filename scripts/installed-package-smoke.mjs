@@ -112,7 +112,16 @@ async function startOpenFecStub() {
     const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
     if (request.method === 'GET' && requestUrl.pathname === '/v1/candidates/search/') {
       response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ pagination: { count: 0, pages: 0 }, results: [] }));
+      response.end(JSON.stringify({
+        pagination: {
+          count: 0,
+          is_count_exact: true,
+          page: 1,
+          pages: 0,
+          per_page: 20,
+        },
+        results: [],
+      }));
       return;
     }
     response.writeHead(404, { 'content-type': 'application/json' });

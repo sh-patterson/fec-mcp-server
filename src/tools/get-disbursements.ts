@@ -11,6 +11,20 @@ import { transformScheduleB, formatDisbursementsText } from '../utils/formatters
 import { loadReferenceData } from '../notable/reference-data.js';
 import { classifyNotableDisbursements } from '../notable/classifier.js';
 import { formatNotableDisbursementsText } from '../notable/formatters.js';
+import {
+  createKeysetPaginationState,
+  decodeContinuationToken,
+  encodeContinuationToken,
+  formatPaginationFooter,
+  validateOpenFecKeysetValues,
+} from '../pagination/continuation.js';
+
+const DISBURSEMENT_CURSOR_KEYS = [
+  'last_index',
+  'last_disbursement_amount',
+  'last_disbursement_date',
+  'sort_null_only',
+] as const;
 
 export const GET_DISBURSEMENTS_TOOL = {
   name: 'get_disbursements',
@@ -35,6 +49,7 @@ export async function executeGetDisbursements(
     purpose?: string;
     limit?: number;
     sort_by?: 'amount' | 'date';
+    continuation?: string;
   }
 ): Promise<GetDisbursementsResult> {
   try {
@@ -46,15 +61,55 @@ export async function executeGetDisbursements(
     const fuzzyThreshold = params.fuzzy_threshold ?? 90;
     const minimumAmount = params.min_amount ?? 1000;
     const sortBy = params.sort_by ?? 'amount';
-
+    const limit = params.limit ?? 20;
+    const effectiveFilters = {
+      committee_id: params.committee_id,
+      min_amount: minimumAmount,
+      two_year_transaction_period: transactionPeriod,
+      purpose: params.purpose,
+      include_notable: includeNotable,
+      fuzzy_threshold: fuzzyThreshold,
+      limit,
+      sort: sortBy,
+    };
+    const requiredCursorKeys = [
+      'last_index',
+      sortBy === 'date' ? 'last_disbursement_date' : 'last_disbursement_amount',
+    ] as const;
+    const continuationCursor = params.continuation
+      ? decodeContinuationToken({
+          token: params.continuation,
+          tool: 'get_disbursements',
+          effectiveFilters,
+          cursorKind: 'keyset',
+          allowedKeysetKeys: DISBURSEMENT_CURSOR_KEYS,
+          requiredKeysetKeys: requiredCursorKeys,
+        })
+      : null;
     const response = await client.getScheduleB({
       committee_id: params.committee_id,
       min_amount: minimumAmount,
       two_year_transaction_period: transactionPeriod,
       purpose: params.purpose,
-      limit: params.limit ?? 20,
+      limit,
       sort_by: sortBy,
+      cursor: continuationCursor?.values,
     });
+    const pagination = createKeysetPaginationState(response.pagination);
+    const nextCursor = pagination.nextValues === null
+      ? null
+      : validateOpenFecKeysetValues(
+          pagination.nextValues,
+          DISBURSEMENT_CURSOR_KEYS,
+          requiredCursorKeys
+        );
+    const nextContinuation = nextCursor === null
+      ? undefined
+      : encodeContinuationToken({
+          tool: 'get_disbursements',
+          effectiveFilters,
+          cursor: { kind: 'keyset', values: nextCursor },
+        });
 
     // Transform to formatted disbursements
     const disbursements = response.results.map(transformScheduleB);
@@ -80,7 +135,6 @@ export async function executeGetDisbursements(
     ];
     lines.push(`*Filters: ${filters.join('; ')}*`);
 
-    lines.push(`*Showing ${disbursements.length} of ${response.pagination.count} results*`);
     lines.push('');
 
     if (includeNotable) {
@@ -101,6 +155,8 @@ export async function executeGetDisbursements(
     // Format disbursements
     const disbursementsText = formatDisbursementsText(disbursements);
     lines.push(disbursementsText);
+    lines.push('');
+    lines.push(formatPaginationFooter(disbursements.length, pagination, nextContinuation));
 
     return {
       content: [{ type: 'text', text: lines.join('\n') }],
