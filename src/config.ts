@@ -8,14 +8,64 @@ import { config as loadDotenv } from 'dotenv';
 // Load .env file
 loadDotenv();
 
+export const DEFAULT_FEC_API_BASE_URL = 'https://api.open.fec.gov/v1';
+
 export interface Config {
   fecApiKey?: string;
   fecApiBaseUrl: string;
   fecApiTimeoutMs?: number;
 }
 
-function getOptionalEnv(key: string, defaultValue: string): string {
-  return process.env[key] || defaultValue;
+function normalizeBaseUrl(value: string): string {
+  return value.trim().replace(/\/+$/, '');
+}
+
+/**
+ * Only official OpenFEC HTTPS hosts (or local mocks) may receive the API key.
+ */
+export function isAllowedFecApiBaseUrl(baseUrl: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    return false;
+  }
+
+  if (parsed.username || parsed.password) {
+    return false;
+  }
+
+  const path = parsed.pathname.replace(/\/+$/, '') || '/';
+
+  if (parsed.protocol === 'https:') {
+    const allowedHosts = new Set(['api.open.fec.gov', 'api-stage.open.fec.gov']);
+    return allowedHosts.has(parsed.hostname) && path === '/v1';
+  }
+
+  if (parsed.protocol === 'http:') {
+    return (
+      (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') &&
+      path.length > 0
+    );
+  }
+
+  return false;
+}
+
+function resolveFecApiBaseUrl(): string {
+  const raw = process.env.FEC_API_BASE_URL?.trim();
+  if (!raw) {
+    return DEFAULT_FEC_API_BASE_URL;
+  }
+
+  const normalized = normalizeBaseUrl(raw);
+  if (!isAllowedFecApiBaseUrl(normalized)) {
+    throw new Error(
+      'FEC_API_BASE_URL must be https://api.open.fec.gov/v1 (or api-stage) or an http://localhost mock URL.'
+    );
+  }
+
+  return normalized;
 }
 
 export function loadConfig(): Config {
@@ -26,7 +76,7 @@ export function loadConfig(): Config {
 
   return {
     fecApiKey: apiKey ? apiKey : undefined,
-    fecApiBaseUrl: getOptionalEnv('FEC_API_BASE_URL', 'https://api.open.fec.gov/v1'),
+    fecApiBaseUrl: resolveFecApiBaseUrl(),
     fecApiTimeoutMs: timeoutMs && !Number.isNaN(timeoutMs) ? timeoutMs : undefined,
   };
 }
