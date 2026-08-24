@@ -200,6 +200,22 @@ export function validateOpenFecKeysetValues(
   }
 }
 
+/**
+ * Prefer returning the current page with no continuation over failing the whole tool
+ * when OpenFEC sends incomplete keyset metadata.
+ */
+export function tryValidateOpenFecKeysetValues(
+  value: unknown,
+  allowedKeys: readonly string[],
+  requiredKeys: readonly string[]
+): KeysetCursorValues | null {
+  try {
+    return validateOpenFecKeysetValues(value, allowedKeys, requiredKeys);
+  } catch {
+    return null;
+  }
+}
+
 function validateKeysetCursor(
   value: unknown,
   allowedKeys?: readonly string[],

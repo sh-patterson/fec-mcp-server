@@ -13,7 +13,7 @@ import {
   decodeContinuationToken,
   encodeContinuationToken,
   formatPaginationFooter,
-  validateOpenFecKeysetValues,
+  tryValidateOpenFecKeysetValues,
 } from '../pagination/continuation.js';
 
 const DONOR_CURSOR_KEYS = [
@@ -88,7 +88,7 @@ export async function executeSearchDonors(
     const pagination = createKeysetPaginationState(response.pagination);
     const nextCursor = pagination.nextValues === null
       ? null
-      : validateOpenFecKeysetValues(
+      : tryValidateOpenFecKeysetValues(
           pagination.nextValues,
           DONOR_CURSOR_KEYS,
           REQUIRED_DONOR_CURSOR_KEYS

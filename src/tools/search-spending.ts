@@ -13,7 +13,7 @@ import {
   decodeContinuationToken,
   encodeContinuationToken,
   formatPaginationFooter,
-  validateOpenFecKeysetValues,
+  tryValidateOpenFecKeysetValues,
 } from '../pagination/continuation.js';
 
 const SPENDING_CURSOR_KEYS = [
@@ -85,7 +85,7 @@ export async function executeSearchSpending(
     const pagination = createKeysetPaginationState(response.pagination);
     const nextCursor = pagination.nextValues === null
       ? null
-      : validateOpenFecKeysetValues(
+      : tryValidateOpenFecKeysetValues(
           pagination.nextValues,
           SPENDING_CURSOR_KEYS,
           REQUIRED_SPENDING_CURSOR_KEYS

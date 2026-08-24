@@ -21,7 +21,7 @@ import {
   decodeContinuationToken,
   encodeContinuationToken,
   formatPaginationFooter,
-  validateOpenFecKeysetValues,
+  tryValidateOpenFecKeysetValues,
 } from '../pagination/continuation.js';
 
 const RECEIPT_CURSOR_KEYS = [
@@ -108,7 +108,7 @@ export async function executeGetReceipts(
     const pagination = createKeysetPaginationState(response.pagination);
     const nextCursor = pagination.nextValues === null
       ? null
-      : validateOpenFecKeysetValues(
+      : tryValidateOpenFecKeysetValues(
           pagination.nextValues,
           RECEIPT_CURSOR_KEYS,
           requiredCursorKeys

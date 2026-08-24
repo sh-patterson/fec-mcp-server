@@ -20,6 +20,19 @@ export interface GetCommitteeFlagsResult {
   isError?: boolean;
 }
 
+function isRfaiFiling(filing: FECFiling): boolean {
+  if (filing.form_type === 'RFAI') {
+    return true;
+  }
+
+  const description = [filing.document_description, filing.document_type_full]
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .join(' ')
+    .toLowerCase();
+
+  return description.includes('request for additional information');
+}
+
 /**
  * Analyze filings to extract flags
  */
@@ -28,12 +41,7 @@ function analyzeFilings(filings: FECFiling[]): CommitteeFilingReview {
   const amendments: FECFiling[] = [];
 
   for (const filing of filings) {
-    const description = filing.document_description ?? filing.document_type_full;
-    if (
-      filing.form_type === 'RFAI' ||
-      filing.form_type === 'FRQ' ||
-      description.toLowerCase().includes('request for additional information')
-    ) {
+    if (isRfaiFiling(filing)) {
       rfais.push(filing);
     }
 

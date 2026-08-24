@@ -39,14 +39,27 @@ export async function executeGetCommitteeFinances(
       }),
     ]);
 
-    if (totalsResponse.results.length === 0 || reportsResponse.results.length === 0) {
+    if (totalsResponse.results.length === 0) {
       throw new NotFoundError('Committee financial records', params.committee_id);
     }
 
-    const summary = transformCommitteeFinancials(
-      totalsResponse.results[0],
-      reportsResponse.results[0]
-    );
+    const totals = totalsResponse.results[0];
+    let report = reportsResponse.results.find((entry) => entry.cycle === totals.cycle);
+
+    // When cycle is omitted, totals and reports can land on different cycles.
+    // Re-fetch the final report for the totals cycle before mixing numbers.
+    if (!report && params.cycle === undefined) {
+      const cycleReports = await client.getCommitteeReports(params.committee_id, {
+        cycle: totals.cycle,
+      });
+      report = cycleReports.results[0];
+    }
+
+    if (!report) {
+      throw new NotFoundError('Committee financial records', params.committee_id);
+    }
+
+    const summary = transformCommitteeFinancials(totals, report);
     const formattedText = formatFinancialSummaryText(summary);
 
     return {

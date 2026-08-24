@@ -13,7 +13,7 @@ import {
   decodeContinuationToken,
   encodeContinuationToken,
   formatPaginationFooter,
-  validateOpenFecKeysetValues,
+  tryValidateOpenFecKeysetValues,
 } from '../pagination/continuation.js';
 
 const EXPENDITURE_CURSOR_KEYS = [
@@ -89,7 +89,7 @@ export async function executeGetIndependentExpenditures(
     const pagination = createKeysetPaginationState(response.pagination);
     const nextCursor = pagination.nextValues === null
       ? null
-      : validateOpenFecKeysetValues(
+      : tryValidateOpenFecKeysetValues(
           pagination.nextValues,
           EXPENDITURE_CURSOR_KEYS,
           REQUIRED_EXPENDITURE_CURSOR_KEYS
