@@ -68,8 +68,9 @@ describe('Live FEC API E2E Tests', () => {
       });
 
       expect(result.isError).toBeUndefined();
-      expect(result.content[0].text).toContain('Financial Summary');
-      expect(result.content[0].text).toContain('Total Receipts');
+      expect(result.content[0].text).toContain('Cycle totals');
+      expect(result.content[0].text).toContain('Cycle total receipts');
+      expect(result.content[0].text).toContain('Latest final report balances');
       expect(result.content[0].text).toContain('SWALWELL');
     });
 
@@ -83,8 +84,8 @@ describe('Live FEC API E2E Tests', () => {
     });
   });
 
-  describe('get_receipts with PAC enrichment', () => {
-    it('should return contributions with PAC classification', async () => {
+  describe('get_receipts', () => {
+    it('should return contributions', async () => {
       const result = await executeGetReceipts(client, {
         committee_id: 'C00502294', // Swalwell
         min_amount: 1000,
@@ -103,7 +104,6 @@ describe('Live FEC API E2E Tests', () => {
       });
 
       expect(result.isError).toBeUndefined();
-      // If PAC contributions exist, should show classification
     });
   });
 
@@ -136,6 +136,7 @@ describe('Live FEC API E2E Tests', () => {
       const result = await executeGetIndependentExpenditures(client, {
         candidate_id: 'H8CA15053',
         support_oppose: 'support',
+        cycle: 2024,
         limit: 5,
       });
 
@@ -153,13 +154,13 @@ describe('Live FEC API E2E Tests', () => {
   });
 
   describe('get_committee_flags', () => {
-    it('should check for compliance issues', async () => {
+    it('should return filing review signals', async () => {
       const result = await executeGetCommitteeFlags(client, {
         committee_id: 'C00502294', // Swalwell
       });
 
       expect(result.isError).toBeUndefined();
-      expect(result.content[0].text).toContain('Compliance Review');
+      expect(result.content[0].text).toContain('Filing review signals');
     }, 60000); // Longer timeout for this API call
   });
 });
