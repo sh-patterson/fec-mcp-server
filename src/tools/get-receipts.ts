@@ -17,11 +17,9 @@ import { loadReferenceData } from '../notable/reference-data.js';
 import { classifyNotableReceipts } from '../notable/classifier.js';
 import { formatNotableReceiptsText } from '../notable/formatters.js';
 import {
-  createKeysetPaginationState,
-  decodeContinuationToken,
-  encodeContinuationToken,
+  createKeysetContinuation,
   formatPaginationFooter,
-  tryValidateOpenFecKeysetValues,
+  readKeysetContinuation,
 } from '../pagination/continuation.js';
 
 const RECEIPT_CURSOR_KEYS = [
@@ -86,16 +84,13 @@ export async function executeGetReceipts(
         ? 'last_contribution_receipt_date'
         : 'last_contribution_receipt_amount',
     ] as const;
-    const continuationCursor = params.continuation
-      ? decodeContinuationToken({
-          token: params.continuation,
-          tool: 'get_receipts',
-          effectiveFilters,
-          cursorKind: 'keyset',
-          allowedKeysetKeys: RECEIPT_CURSOR_KEYS,
-          requiredKeysetKeys: requiredCursorKeys,
-        })
-      : null;
+    const continuationPolicy = {
+      tool: 'get_receipts' as const,
+      effectiveFilters,
+      allowedKeys: RECEIPT_CURSOR_KEYS,
+      requiredKeys: requiredCursorKeys,
+    };
+    const continuationCursor = readKeysetContinuation(params.continuation, continuationPolicy);
     const response = await client.getScheduleA({
       committee_id: params.committee_id,
       min_amount: minimumAmount,
@@ -103,23 +98,12 @@ export async function executeGetReceipts(
       contributor_type: params.contributor_type,
       limit,
       sort_by: sortBy,
-      cursor: continuationCursor?.values,
+      cursor: continuationCursor,
     });
-    const pagination = createKeysetPaginationState(response.pagination);
-    const nextCursor = pagination.nextValues === null
-      ? null
-      : tryValidateOpenFecKeysetValues(
-          pagination.nextValues,
-          RECEIPT_CURSOR_KEYS,
-          requiredCursorKeys
-        );
-    const nextContinuation = nextCursor === null
-      ? undefined
-      : encodeContinuationToken({
-          tool: 'get_receipts',
-          effectiveFilters,
-          cursor: { kind: 'keyset', values: nextCursor },
-        });
+    const { pagination, nextContinuation } = createKeysetContinuation(
+      response.pagination,
+      continuationPolicy
+    );
 
     // Get unique PAC committee IDs for enrichment
     const pacCommitteeIds = [

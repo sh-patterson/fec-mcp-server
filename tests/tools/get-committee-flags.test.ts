@@ -90,6 +90,26 @@ describe('get_committee_flags tool', () => {
     expect(result.content[0].text).toContain('Amendments');
   });
 
+  it('should disclose that reported flag counts cover only fetched filings', async () => {
+    vi.spyOn(mockClient, 'getFilings')
+      .mockResolvedValueOnce({
+        ...mockFilingsResponse,
+        pagination: { count: 120, page: 1, pages: 3, per_page: 50, is_count_exact: true },
+      })
+      .mockResolvedValueOnce({
+        ...mockFilingsResponse,
+        pagination: { count: 34, page: 1, pages: 2, per_page: 20, is_count_exact: false },
+        results: [mockFilingsResponse.results[1]],
+      });
+
+    const result = await executeGetCommitteeFlags(mockClient, { committee_id: 'C00523969' });
+    const text = result.content[0].text;
+
+    expect(text).toContain('First 3 of 120 total recent filings');
+    expect(text).toContain('first 1 of 34 reported total RFAI filings');
+    expect(text).toContain('Counts and signals below apply only to the reviewed records');
+  });
+
   it('should pass cycle to both filings lookups', async () => {
     const spy = vi
       .spyOn(mockClient, 'getFilings')

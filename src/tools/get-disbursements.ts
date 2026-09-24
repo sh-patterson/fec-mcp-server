@@ -12,11 +12,9 @@ import { loadReferenceData } from '../notable/reference-data.js';
 import { classifyNotableDisbursements } from '../notable/classifier.js';
 import { formatNotableDisbursementsText } from '../notable/formatters.js';
 import {
-  createKeysetPaginationState,
-  decodeContinuationToken,
-  encodeContinuationToken,
+  createKeysetContinuation,
   formatPaginationFooter,
-  tryValidateOpenFecKeysetValues,
+  readKeysetContinuation,
 } from '../pagination/continuation.js';
 
 const DISBURSEMENT_CURSOR_KEYS = [
@@ -76,16 +74,13 @@ export async function executeGetDisbursements(
       'last_index',
       sortBy === 'date' ? 'last_disbursement_date' : 'last_disbursement_amount',
     ] as const;
-    const continuationCursor = params.continuation
-      ? decodeContinuationToken({
-          token: params.continuation,
-          tool: 'get_disbursements',
-          effectiveFilters,
-          cursorKind: 'keyset',
-          allowedKeysetKeys: DISBURSEMENT_CURSOR_KEYS,
-          requiredKeysetKeys: requiredCursorKeys,
-        })
-      : null;
+    const continuationPolicy = {
+      tool: 'get_disbursements' as const,
+      effectiveFilters,
+      allowedKeys: DISBURSEMENT_CURSOR_KEYS,
+      requiredKeys: requiredCursorKeys,
+    };
+    const continuationCursor = readKeysetContinuation(params.continuation, continuationPolicy);
     const response = await client.getScheduleB({
       committee_id: params.committee_id,
       min_amount: minimumAmount,
@@ -93,23 +88,12 @@ export async function executeGetDisbursements(
       purpose: params.purpose,
       limit,
       sort_by: sortBy,
-      cursor: continuationCursor?.values,
+      cursor: continuationCursor,
     });
-    const pagination = createKeysetPaginationState(response.pagination);
-    const nextCursor = pagination.nextValues === null
-      ? null
-      : tryValidateOpenFecKeysetValues(
-          pagination.nextValues,
-          DISBURSEMENT_CURSOR_KEYS,
-          requiredCursorKeys
-        );
-    const nextContinuation = nextCursor === null
-      ? undefined
-      : encodeContinuationToken({
-          tool: 'get_disbursements',
-          effectiveFilters,
-          cursor: { kind: 'keyset', values: nextCursor },
-        });
+    const { pagination, nextContinuation } = createKeysetContinuation(
+      response.pagination,
+      continuationPolicy
+    );
 
     // Transform to formatted disbursements
     const disbursements = response.results.map(transformScheduleB);

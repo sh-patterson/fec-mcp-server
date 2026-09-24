@@ -82,13 +82,11 @@ export interface GetScheduleBParams {
 
 export interface GetScheduleCParams {
   committee_id: string;
-  two_year_transaction_period?: number;
   limit?: number;
 }
 
 export interface GetScheduleDParams {
   committee_id: string;
-  two_year_transaction_period?: number;
   limit?: number;
 }
 
@@ -97,7 +95,7 @@ export interface GetScheduleEParams {
   committee_id?: string;
   support_oppose_indicator?: 'S' | 'O';
   min_amount?: number;
-  two_year_transaction_period?: number;
+  cycle?: number;
   limit?: number;
   cursor?: ScheduleECursor;
 }
@@ -214,8 +212,6 @@ export class FECClient {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
         if (response.status === 429) {
           throw new RateLimitError(response.headers.get('Retry-After') ?? undefined);
@@ -231,8 +227,6 @@ export class FECClient {
       const data = await response.json();
       return data as FECApiResponse<T>;
     } catch (error) {
-      clearTimeout(timeoutId);
-
       if (error instanceof FECApiError || error instanceof RateLimitError) {
         throw error;
       }
@@ -245,6 +239,8 @@ export class FECClient {
       }
 
       throw new FECApiError('Unknown error occurred', undefined, endpoint);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -348,7 +344,6 @@ export class FECClient {
   async getScheduleC(params: GetScheduleCParams): Promise<FECApiResponse<FECScheduleC>> {
     return this.get<FECScheduleC>(ENDPOINTS.SCHEDULE_C, {
       committee_id: params.committee_id,
-      two_year_transaction_period: params.two_year_transaction_period,
       sort: '-incurred_date',
       per_page: params.limit || DEFAULT_PER_PAGE,
     });
@@ -360,7 +355,6 @@ export class FECClient {
   async getScheduleD(params: GetScheduleDParams): Promise<FECApiResponse<FECScheduleD>> {
     return this.get<FECScheduleD>(ENDPOINTS.SCHEDULE_D, {
       committee_id: params.committee_id,
-      two_year_transaction_period: params.two_year_transaction_period,
       sort: '-coverage_end_date',
       per_page: params.limit || DEFAULT_PER_PAGE,
     });
@@ -375,7 +369,7 @@ export class FECClient {
       committee_id: params.committee_id,
       support_oppose_indicator: params.support_oppose_indicator,
       min_amount: params.min_amount,
-      two_year_transaction_period: params.two_year_transaction_period,
+      cycle: params.cycle,
       sort: '-expenditure_amount',
       per_page: params.limit || DEFAULT_PER_PAGE,
       ...params.cursor,

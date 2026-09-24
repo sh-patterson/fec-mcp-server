@@ -4,7 +4,7 @@
  */
 
 import type { FECClient } from '../api/client.js';
-import type { CommitteeFilingReview, FECFiling } from '../api/types.js';
+import type { CommitteeFilingReview, FECFiling, FECPagination } from '../api/types.js';
 import { getCommitteeFlagsInputSchema } from '../schemas/committee-flags.schema.js';
 import { formatErrorForToolResponse, NotFoundError } from '../utils/errors.js';
 import { formatDate } from '../utils/formatters.js';
@@ -92,10 +92,21 @@ function analyzeFilings(filings: FECFiling[]): CommitteeFilingReview {
 /**
  * Format flags for display
  */
-function formatFlagsText(review: CommitteeFilingReview): string {
+function describeCoverage(shown: number, pagination: Pick<FECPagination, 'count' | 'is_count_exact'>): string {
+  const total = pagination.count === null
+    ? 'an unspecified total'
+    : pagination.is_count_exact === true
+      ? `${pagination.count} total`
+      : `${pagination.count} reported total`;
+  return `${shown} of ${total}`;
+}
+
+function formatFlagsText(review: CommitteeFilingReview, coverage: string): string {
   const lines: string[] = [
     `## Filing review signals: ${review.committee_name}`,
     `**Committee ID:** ${review.committee_id}`,
+    `**Coverage:** ${coverage}`,
+    'Counts and signals below apply only to the reviewed records.',
     '',
   ];
 
@@ -174,7 +185,8 @@ export async function executeGetCommitteeFlags(
 
     // Analyze filings for flags
     const flags = analyzeFilings(allFilings);
-    const formattedText = formatFlagsText(flags);
+    const coverage = `First ${describeCoverage(filingsResponse.results.length, filingsResponse.pagination)} recent filings; first ${describeCoverage(rfaiResponse.results.length, rfaiResponse.pagination)} RFAI filings.`;
+    const formattedText = formatFlagsText(flags, coverage);
 
     return {
       content: [{ type: 'text', text: formattedText }],
