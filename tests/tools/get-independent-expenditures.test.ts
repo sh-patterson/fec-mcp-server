@@ -98,7 +98,7 @@ describe('get_independent_expenditures tool', () => {
       expect.objectContaining({
         candidate_id: 'H8CA15053',
         support_oppose_indicator: 'S',
-        two_year_transaction_period: 2024,
+        cycle: 2024,
         limit: 5,
       })
     );

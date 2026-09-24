@@ -77,7 +77,7 @@ export async function executeGetIndependentExpenditures(
       committee_id: params.committee_id,
       support_oppose_indicator: supportOpposeIndicator,
       min_amount: params.min_amount,
-      two_year_transaction_period: params.cycle,
+      cycle: params.cycle,
       limit,
       cursor: continuationCursor,
     });

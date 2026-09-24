@@ -465,13 +465,13 @@ describe('FECClient', () => {
       await client.getScheduleE({
         candidate_id: 'H8CA15053',
         support_oppose_indicator: 'S',
-        two_year_transaction_period: 2024,
+        cycle: 2024,
       });
 
       const calledUrl = getCalledUrl(fetchSpy.mock.calls[0][0]);
       expect(calledUrl).toContain('candidate_id=H8CA15053');
       expect(calledUrl).toContain('support_oppose_indicator=S');
-      expect(calledUrl).toContain('two_year_transaction_period=2024');
+      expect(calledUrl).toContain('cycle=2024');
     });
 
     it('should pass Schedule E keyset values', async () => {
