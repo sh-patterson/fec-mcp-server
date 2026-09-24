@@ -368,6 +368,55 @@ export function createKeysetPaginationState(
   };
 }
 
+interface KeysetContinuationPolicy {
+  tool: ContinuationTool;
+  effectiveFilters: Record<string, unknown>;
+  allowedKeys: readonly string[];
+  requiredKeys: readonly string[];
+}
+
+export function readKeysetContinuation(
+  token: string | undefined,
+  policy: KeysetContinuationPolicy
+): KeysetCursorValues | undefined {
+  if (!token) return undefined;
+  return decodeContinuationToken({
+    token,
+    tool: policy.tool,
+    effectiveFilters: policy.effectiveFilters,
+    cursorKind: 'keyset',
+    allowedKeysetKeys: policy.allowedKeys,
+    requiredKeysetKeys: policy.requiredKeys,
+  }).values;
+}
+
+export function createKeysetContinuation(
+  responsePagination: FECPagination | FECKeysetPagination,
+  policy: KeysetContinuationPolicy
+): {
+  pagination: Extract<PaginationState, { kind: 'keyset' }>;
+  nextContinuation?: string;
+} {
+  const pagination = createKeysetPaginationState(responsePagination);
+  const nextCursor = pagination.nextValues === null
+    ? null
+    : tryValidateOpenFecKeysetValues(
+        pagination.nextValues,
+        policy.allowedKeys,
+        policy.requiredKeys
+      );
+  return {
+    pagination,
+    nextContinuation: nextCursor === null
+      ? undefined
+      : encodeContinuationToken({
+          tool: policy.tool,
+          effectiveFilters: policy.effectiveFilters,
+          cursor: { kind: 'keyset', values: nextCursor },
+        }),
+  };
+}
+
 function formatCount(count: ResultCount): string {
   if (count.status === 'exact') {
     return `exact (${count.value} records)`;

@@ -9,11 +9,9 @@ import { formatErrorForToolResponse } from '../utils/errors.js';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
 import { formatCycleFilter } from '../utils/filters.js';
 import {
-  createKeysetPaginationState,
-  decodeContinuationToken,
-  encodeContinuationToken,
+  createKeysetContinuation,
   formatPaginationFooter,
-  tryValidateOpenFecKeysetValues,
+  readKeysetContinuation,
 } from '../pagination/continuation.js';
 
 const DONOR_CURSOR_KEYS = [
@@ -65,16 +63,13 @@ export async function executeSearchDonors(
       type: 'individual',
       sort: 'amount',
     };
-    const continuationCursor = params.continuation
-      ? decodeContinuationToken({
-          token: params.continuation,
-          tool: 'search_donors',
-          effectiveFilters,
-          cursorKind: 'keyset',
-          allowedKeysetKeys: DONOR_CURSOR_KEYS,
-          requiredKeysetKeys: REQUIRED_DONOR_CURSOR_KEYS,
-        })
-      : null;
+    const continuationPolicy = {
+      tool: 'search_donors' as const,
+      effectiveFilters,
+      allowedKeys: DONOR_CURSOR_KEYS,
+      requiredKeys: REQUIRED_DONOR_CURSOR_KEYS,
+    };
+    const continuationCursor = readKeysetContinuation(params.continuation, continuationPolicy);
     const response = await client.searchDonors({
       contributor_name: params.contributor_name,
       contributor_employer: params.contributor_employer,
@@ -83,23 +78,12 @@ export async function executeSearchDonors(
       min_amount: minimumAmount,
       two_year_transaction_period: params.cycle,
       limit,
-      cursor: continuationCursor?.values,
+      cursor: continuationCursor,
     });
-    const pagination = createKeysetPaginationState(response.pagination);
-    const nextCursor = pagination.nextValues === null
-      ? null
-      : tryValidateOpenFecKeysetValues(
-          pagination.nextValues,
-          DONOR_CURSOR_KEYS,
-          REQUIRED_DONOR_CURSOR_KEYS
-        );
-    const nextContinuation = nextCursor === null
-      ? undefined
-      : encodeContinuationToken({
-          tool: 'search_donors',
-          effectiveFilters,
-          cursor: { kind: 'keyset', values: nextCursor },
-        });
+    const { pagination, nextContinuation } = createKeysetContinuation(
+      response.pagination,
+      continuationPolicy
+    );
 
     // Build header
     const lines: string[] = ['## Donor Search Results'];

@@ -177,6 +177,27 @@ describe('FECClient', () => {
       expect(timeoutCall).toBeDefined();
       setTimeoutSpy.mockRestore();
     });
+
+    it('should keep the timeout active while reading the response body', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.spyOn(global, 'fetch').mockImplementation(async (_url, options) => ({
+          ok: true,
+          json: () => new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('Aborted', 'AbortError'));
+            });
+          }),
+        }) as Response);
+
+        const request = client.get('/candidates/search/', {}, 25);
+        const assertion = expect(request).rejects.toThrow('Request timeout after 25ms');
+        await vi.advanceTimersByTimeAsync(25);
+        await assertion;
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('searchCandidates', () => {

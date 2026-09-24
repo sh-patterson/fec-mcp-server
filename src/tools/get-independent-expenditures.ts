@@ -9,11 +9,9 @@ import { formatErrorForToolResponse } from '../utils/errors.js';
 import { formatCycleFilter } from '../utils/filters.js';
 import { formatIndependentExpenditureText } from '../utils/formatters.js';
 import {
-  createKeysetPaginationState,
-  decodeContinuationToken,
-  encodeContinuationToken,
+  createKeysetContinuation,
   formatPaginationFooter,
-  tryValidateOpenFecKeysetValues,
+  readKeysetContinuation,
 } from '../pagination/continuation.js';
 
 const EXPENDITURE_CURSOR_KEYS = [
@@ -67,16 +65,13 @@ export async function executeGetIndependentExpenditures(
       limit,
       sort: 'amount',
     };
-    const continuationCursor = params.continuation
-      ? decodeContinuationToken({
-          token: params.continuation,
-          tool: 'get_independent_expenditures',
-          effectiveFilters,
-          cursorKind: 'keyset',
-          allowedKeysetKeys: EXPENDITURE_CURSOR_KEYS,
-          requiredKeysetKeys: REQUIRED_EXPENDITURE_CURSOR_KEYS,
-        })
-      : null;
+    const continuationPolicy = {
+      tool: 'get_independent_expenditures' as const,
+      effectiveFilters,
+      allowedKeys: EXPENDITURE_CURSOR_KEYS,
+      requiredKeys: REQUIRED_EXPENDITURE_CURSOR_KEYS,
+    };
+    const continuationCursor = readKeysetContinuation(params.continuation, continuationPolicy);
     const response = await client.getScheduleE({
       candidate_id: params.candidate_id,
       committee_id: params.committee_id,
@@ -84,23 +79,12 @@ export async function executeGetIndependentExpenditures(
       min_amount: params.min_amount,
       two_year_transaction_period: params.cycle,
       limit,
-      cursor: continuationCursor?.values,
+      cursor: continuationCursor,
     });
-    const pagination = createKeysetPaginationState(response.pagination);
-    const nextCursor = pagination.nextValues === null
-      ? null
-      : tryValidateOpenFecKeysetValues(
-          pagination.nextValues,
-          EXPENDITURE_CURSOR_KEYS,
-          REQUIRED_EXPENDITURE_CURSOR_KEYS
-        );
-    const nextContinuation = nextCursor === null
-      ? undefined
-      : encodeContinuationToken({
-          tool: 'get_independent_expenditures',
-          effectiveFilters,
-          cursor: { kind: 'keyset', values: nextCursor },
-        });
+    const { pagination, nextContinuation } = createKeysetContinuation(
+      response.pagination,
+      continuationPolicy
+    );
 
     // Build header based on search type
     let targetCandidate: string | undefined;

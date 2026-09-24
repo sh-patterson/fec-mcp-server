@@ -9,11 +9,9 @@ import { formatErrorForToolResponse } from '../utils/errors.js';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
 import { formatCycleFilter } from '../utils/filters.js';
 import {
-  createKeysetPaginationState,
-  decodeContinuationToken,
-  encodeContinuationToken,
+  createKeysetContinuation,
   formatPaginationFooter,
-  tryValidateOpenFecKeysetValues,
+  readKeysetContinuation,
 } from '../pagination/continuation.js';
 
 const SPENDING_CURSOR_KEYS = [
@@ -63,16 +61,13 @@ export async function executeSearchSpending(
       type: 'all',
       sort: 'amount',
     };
-    const continuationCursor = params.continuation
-      ? decodeContinuationToken({
-          token: params.continuation,
-          tool: 'search_spending',
-          effectiveFilters,
-          cursorKind: 'keyset',
-          allowedKeysetKeys: SPENDING_CURSOR_KEYS,
-          requiredKeysetKeys: REQUIRED_SPENDING_CURSOR_KEYS,
-        })
-      : null;
+    const continuationPolicy = {
+      tool: 'search_spending' as const,
+      effectiveFilters,
+      allowedKeys: SPENDING_CURSOR_KEYS,
+      requiredKeys: REQUIRED_SPENDING_CURSOR_KEYS,
+    };
+    const continuationCursor = readKeysetContinuation(params.continuation, continuationPolicy);
     const response = await client.searchSpending({
       description: params.description,
       recipient_name: params.recipient_name,
@@ -80,23 +75,12 @@ export async function executeSearchSpending(
       min_amount: minimumAmount,
       two_year_transaction_period: params.cycle,
       limit,
-      cursor: continuationCursor?.values,
+      cursor: continuationCursor,
     });
-    const pagination = createKeysetPaginationState(response.pagination);
-    const nextCursor = pagination.nextValues === null
-      ? null
-      : tryValidateOpenFecKeysetValues(
-          pagination.nextValues,
-          SPENDING_CURSOR_KEYS,
-          REQUIRED_SPENDING_CURSOR_KEYS
-        );
-    const nextContinuation = nextCursor === null
-      ? undefined
-      : encodeContinuationToken({
-          tool: 'search_spending',
-          effectiveFilters,
-          cursor: { kind: 'keyset', values: nextCursor },
-        });
+    const { pagination, nextContinuation } = createKeysetContinuation(
+      response.pagination,
+      continuationPolicy
+    );
 
     // Build header
     const lines: string[] = ['## Spending Search Results'];

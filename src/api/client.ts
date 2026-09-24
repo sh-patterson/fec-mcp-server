@@ -214,8 +214,6 @@ export class FECClient {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
         if (response.status === 429) {
           throw new RateLimitError(response.headers.get('Retry-After') ?? undefined);
@@ -231,8 +229,6 @@ export class FECClient {
       const data = await response.json();
       return data as FECApiResponse<T>;
     } catch (error) {
-      clearTimeout(timeoutId);
-
       if (error instanceof FECApiError || error instanceof RateLimitError) {
         throw error;
       }
@@ -245,6 +241,8 @@ export class FECClient {
       }
 
       throw new FECApiError('Unknown error occurred', undefined, endpoint);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
